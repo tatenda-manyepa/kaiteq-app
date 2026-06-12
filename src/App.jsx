@@ -5,7 +5,7 @@ import {
   Circle, ChevronRight, Phone, Mail, Globe, MapPin, Building2, Paperclip, Upload,
   ArrowRight, ArrowLeft, Brain, Cog, Share2, BarChart3, AlertTriangle, CheckCircle2,
   Video, X, Trash2, Target, Search, Rocket, Lightbulb, Bug, TrendingUp, PoundSterling,
-  Wallet, Pencil, BookOpen, Briefcase, CalendarClock
+  Wallet, Pencil, BookOpen, Briefcase, CalendarClock, Package, Map, Download
 } from "lucide-react";
 
 /* ===========================================================================
@@ -26,6 +26,10 @@ const STORAGE_KEY = "kaiteq_data_v3";
 const TEAM = ["Tatenda", "Kudzai"];
 const FULLNAME = { Tatenda: "Tatenda Manyepa", Kudzai: "Kudzai Muriro" };
 const gbp = (n) => "£" + (Number(n) || 0).toLocaleString();
+const CITY_COORDS = { london: [51.5074, -0.1278], birmingham: [52.4862, -1.8904], manchester: [53.4808, -2.2426], leeds: [53.8008, -1.5491], liverpool: [53.4084, -2.9916], bristol: [51.4545, -2.5879], sheffield: [53.3811, -1.4701], newcastle: [54.9783, -1.6178], nottingham: [52.9548, -1.1581], leicester: [52.6369, -1.1398], cardiff: [51.4816, -3.1791], glasgow: [55.8642, -4.2518], edinburgh: [55.9533, -3.1883], belfast: [54.5973, -5.9301], southampton: [50.9097, -1.4044], reading: [51.4543, -0.9781], brighton: [50.8225, -0.1372], oxford: [51.7520, -1.2577], cambridge: [52.2053, 0.1218], coventry: [52.4068, -1.5197] };
+function coordsOf(c) { if (c && typeof c.lat === "number" && typeof c.lng === "number" && (c.lat || c.lng)) return [c.lat, c.lng]; const k = ((c && c.city) || "").trim().toLowerCase(); if (CITY_COORDS[k]) return CITY_COORDS[k]; return null; }
+function csvCell(x) { const s = String(x == null ? "" : x); const QQ = String.fromCharCode(34); if (s.indexOf(",") >= 0 || s.indexOf(QQ) >= 0) return QQ + s.split(QQ).join(QQ + QQ) + QQ; return s; }
+function downloadCSV(filename, rows) { const NL = String.fromCharCode(10); const csv = rows.map((r) => r.map(csvCell).join(",")).join(NL); const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
 /* ----- delivery lifecycle (8 stages) ----- */
 const STAGES = [
@@ -81,10 +85,10 @@ const DEV_FLOW = ["Idea", "Backlog", "Design", "Build", "Test", "Deploy", "Impro
 
 /* --------------------------- Seed data (your real clients) --------------------------- */
 const seedCustomers = [
-  { id: "c1", company: "New Leaf Oasis", industry: "Care / Supported Living", website: "newleafoasis.co.uk", status: "Active", health: "healthy",
+  { id: "c1", company: "New Leaf Oasis", industry: "Care / Supported Living", website: "newleafoasis.co.uk", status: "Active", health: "healthy", city: "Birmingham", lat: 52.4862, lng: -1.8904,
     contacts: { owner: "", manager: "", accounts: "", technical: "" }, services: ["Website", "Email", "Branding"],
     notes: "Care / supported-living provider. Engaged for website, email and branding. Website in handover." },
-  { id: "c2", company: "The Hair Studio", industry: "Beauty", website: "", status: "Discovery", health: "attention",
+  { id: "c2", company: "The Hair Studio", industry: "Beauty", website: "", status: "Discovery", health: "attention", city: "London", lat: 51.5074, lng: -0.1278,
     contacts: { owner: "", manager: "", accounts: "", technical: "" }, services: ["Social Media Growth", "Content Management", "AI Marketing Automation"],
     notes: "Hair & accessories business, ~4 years, sole operator. Was a side hustle; now wants to grow into a visible brand. Most profitable line: making hair. Goal (6–12 months): more customers and social-media visibility. Business name to be confirmed — update once the client provides it." },
 ];
@@ -147,9 +151,19 @@ const clientDocs = {
   c2: ["Discovery notes.pdf"],
 };
 
+const seedProducts = [
+  { id: "prod1", name: "Care Compliance Tracker", lead: "Tatenda", health: "on", stageIdx: 4, tags: ["SaaS", "Care"], oneOff: 0, monthly: 49, customersActive: 0, status: "build", notes: "Subscription tool for supported-living providers to track safeguarding tasks and compliance. Spun out of the New Leaf Oasis work." },
+  { id: "prod2", name: "Social Content Engine", lead: "Kudzai", health: "on", stageIdx: 3, tags: ["AI", "Marketing"], oneOff: 299, monthly: 25, customersActive: 0, status: "build", notes: "Productised version of the AI social-content idea — captions, hashtags and a scheduler small businesses can buy off the shelf." },
+  { id: "prod3", name: "KAITEQ Booking Bot", lead: "Tatenda", health: "on", stageIdx: 1, tags: ["Automation"], oneOff: 149, monthly: 15, customersActive: 0, status: "idea", notes: "Reusable appointment / booking automation with reminders. Idea stage." },
+];
+const PRODUCT_STATUS = [
+  { key: "idea", label: "Idea", color: C.mut }, { key: "build", label: "In Build", color: C.cyan },
+  { key: "live", label: "Live", color: C.green }, { key: "paused", label: "Paused", color: C.amber },
+];
+
 /* ----- persistence ----- */
 function loadData() {
-  const def = { customers: seedCustomers, projects: seedProjects, tasks: seedTasks, meetings: seedMeetings,
+  const def = { customers: seedCustomers, projects: seedProjects, products: seedProducts, tasks: seedTasks, meetings: seedMeetings,
     proposals: seedProposals, opportunities: seedOpps, discovery: seedDiscovery, expenses: seedExpenses };
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const d = JSON.parse(raw); return { ...def, ...d }; } } catch (e) {}
   return def;
@@ -232,8 +246,10 @@ function Login({ onLogin }) {
 /* --------------------------- Sidebar --------------------------- */
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "customers", label: "Customers", icon: Users },
   { key: "projects", label: "Projects", icon: FolderKanban },
+  { key: "products", label: "Internal Products", icon: Package },
+  { key: "customers", label: "Customers", icon: Users },
+  { key: "map", label: "Map", icon: Map },
   { key: "finance", label: "Finance", icon: PoundSterling },
   { key: "tasks", label: "Tasks", icon: ListChecks },
   { key: "meetings", label: "Meetings", icon: CalendarDays },
@@ -263,7 +279,6 @@ function Dashboard({ customers, projects, proposals, opportunities, meetings, ex
     { label: "Recurring / mo", value: gbp(recurring), accent: C.purple },
     { label: "Active customers", value: customers.length, accent: C.cyan },
   ];
-  const topOpp = [...opportunities].sort((a, b) => oppScore(b) - oppScore(a))[0];
   return (<div><Topbar title="Dashboard" sub="The whole business at a glance." />
     <div className="grid grid-cols-4 gap-4 mb-6">{stats.map((s) => <Stat key={s.label} {...s} />)}</div>
     <div className="grid grid-cols-3 gap-5">
@@ -278,10 +293,8 @@ function Dashboard({ customers, projects, proposals, opportunities, meetings, ex
         <div className="flex flex-col gap-2 mb-5">{meetings.slice(0, 3).map((m) => (<Card key={m.id} style={{ padding: 12 }}>
           <div className="flex items-center gap-2 mb-1"><Video size={14} style={{ color: C.cyan }} /><span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{m.title}</span></div>
           <div style={{ fontSize: 12, color: C.mut }}>{custName(customers, m.customerId)}</div>
-          <div className="flex items-center gap-1 mt-1" style={{ fontSize: 11, color: C.mut2 }}><Clock size={11} /> {m.when}</div></Card>))}</div>
-        {topOpp && (<><h2 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 10 }}>Top AI opportunity</h2><Card style={{ padding: 14 }}>
-          <div className="flex items-center gap-2 mb-1"><Sparkles size={15} style={{ color: C.amber }} /><span style={{ fontSize: 12, color: C.mut }}>{custName(customers, topOpp.customerId)}</span></div>
-          <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>{topOpp.idea}</div><PriorityPill o={topOpp} /></Card></>)}</div></div></div>);
+          <div className="flex items-center gap-1 mt-1" style={{ fontSize: 11, color: C.mut2 }}><Clock size={11} /> {m.when}</div></Card>))}
+          {meetings.length === 0 && <Card style={{ padding: 14 }}><span style={{ fontSize: 12, color: C.mut2 }}>No meetings scheduled.</span></Card>}</div></div></div></div>);
 }
 
 /* --------------------------- Customers --------------------------- */
@@ -300,6 +313,11 @@ function CustomerModal({ customer, onClose, onSave }) {
       <Field label="Relationship health"><select style={inputStyle} value={f.health} onChange={(e) => set("health", e.target.value)}>{Object.keys(HEALTH).map((k) => <option key={k} value={k}>{HEALTH[k].label}</option>)}</select></Field>
       <Field label="Services (comma separated)"><input style={inputStyle} value={servicesStr} onChange={(e) => set("services", e.target.value)} placeholder="Website, Branding" /></Field>
     </div>
+    <div className="grid grid-cols-3 gap-3">
+      <Field label="City / town"><input style={inputStyle} value={f.city || ""} onChange={(e) => set("city", e.target.value)} placeholder="e.g. London" /></Field>
+      <Field label="Latitude (optional)"><input style={inputStyle} type="number" value={f.lat ?? ""} onChange={(e) => set("lat", e.target.value === "" ? "" : Number(e.target.value))} /></Field>
+      <Field label="Longitude (optional)"><input style={inputStyle} type="number" value={f.lng ?? ""} onChange={(e) => set("lng", e.target.value === "" ? "" : Number(e.target.value))} /></Field>
+    </div>
     <div className="grid grid-cols-2 gap-3">
       <Field label="Owner contact"><input style={inputStyle} value={f.contacts.owner} onChange={(e) => setC("owner", e.target.value)} /></Field>
       <Field label="Manager"><input style={inputStyle} value={f.contacts.manager} onChange={(e) => setC("manager", e.target.value)} /></Field>
@@ -309,19 +327,20 @@ function CustomerModal({ customer, onClose, onSave }) {
     <Field label="Notes"><textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={f.notes} onChange={(e) => set("notes", e.target.value)} /></Field>
   </Modal>);
 }
-function Customers({ customers, projects, onNew, onEdit, onDelete, setActiveProject, setView }) {
+function Customers({ customers, projects, opportunities = [], onNew, onEdit, onDelete, setActiveProject, setView }) {
   const [openId, setOpenId] = useState(null);
   const c = customers.find((x) => x.id === openId);
   const custProjects = (id) => projects.filter((p) => p.customerId === id);
   if (c) {
     const ps = custProjects(c.id);
+    const opps = opportunities.filter((o) => o.customerId === c.id);
     const totalRev = ps.reduce((a, p) => a + (p.revenueRecognised || 0), 0);
     const retainer = ps.reduce((a, p) => a + (p.retainer || 0), 0);
     return (<div>
       <button onClick={() => setOpenId(null)} className="flex items-center gap-1 mb-4" style={{ color: C.mut, fontSize: 13 }}><ChevronRight size={14} style={{ transform: "rotate(180deg)" }} /> All customers</button>
       <div className="flex items-start justify-between mb-5">
         <div><div className="flex items-center gap-3"><h1 style={{ fontSize: 22, fontWeight: 600, color: C.text }}>{c.company}</h1><Chip label={c.status} color={C.cyan} /></div>
-          <div className="flex items-center gap-3 mt-1" style={{ fontSize: 13, color: C.mut }}><Briefcase size={14} /> {c.industry || "—"} · <RelHealth h={c.health} /></div></div>
+          <div className="flex items-center gap-3 mt-1" style={{ fontSize: 13, color: C.mut }}><Briefcase size={14} /> {c.industry || "—"} · <RelHealth h={c.health} />{c.city ? <span className="flex items-center gap-1"> · <MapPin size={13} /> {c.city}</span> : null}</div></div>
         <Btn onClick={() => onEdit(c)}><Pencil size={14} /> Edit</Btn></div>
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Stat label="Total revenue" value={gbp(totalRev)} accent={C.green} />
@@ -339,7 +358,12 @@ function Customers({ customers, projects, onNew, onEdit, onDelete, setActiveProj
           <h3 style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 10 }}>Projects</h3>
           <div className="flex flex-col gap-2">{ps.map((p) => (<div key={p.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 cursor-pointer" style={{ background: C.panel2, border: `1px solid ${C.line}` }} onClick={() => { setActiveProject(p.id); setView("projects"); }}>
             <span style={{ fontSize: 13, color: C.text }}>{p.name}</span><span style={{ fontSize: 12, color: C.cyan }}>{STAGES[p.stageIdx].name} · {p.value ? gbp(p.value) : "TBD"}</span></div>))}
-            {ps.length === 0 && <div style={{ fontSize: 12, color: C.mut2 }}>No projects yet.</div>}</div></Card></div></div>);
+            {ps.length === 0 && <div style={{ fontSize: 12, color: C.mut2 }}>No projects yet.</div>}</div>
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: "16px 0 10px" }}>AI opportunities</h3>
+          <div className="flex flex-col gap-2">{opps.map((o) => (<div key={o.id} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+            <div className="flex items-center gap-2"><Lightbulb size={14} style={{ color: C.amber }} /><span style={{ fontSize: 13, color: C.text }}>{o.idea}</span></div>
+            <div className="flex items-center gap-3">{(o.projectValue || o.monthly) ? <span style={{ fontSize: 12, color: C.green }}>{o.projectValue ? gbp(o.projectValue) : ""}{o.monthly ? " +" + gbp(o.monthly) + "/mo" : ""}</span> : null}<PriorityPill o={o} /></div></div>))}
+            {opps.length === 0 && <div style={{ fontSize: 12, color: C.mut2 }}>No AI opportunities yet — add them in the AI Opportunities section.</div>}</div></Card></div></div>);
   }
   return (<div><Topbar title="Customers" sub="Company profiles, contacts, revenue and relationship health." action={<Btn primary onClick={onNew}><Plus size={15} /> Add customer</Btn>} />
     <div className="grid grid-cols-3 gap-4">{customers.map((c) => { const ps = custProjects(c.id); const rev = ps.reduce((a, p) => a + (p.revenueRecognised || 0), 0);
@@ -444,7 +468,7 @@ function ExpenseModal({ onClose, onCreate }) {
     <div className="grid grid-cols-2 gap-3"><Field label="Amount (£)"><input style={inputStyle} type="number" value={f.amount} onChange={(e) => set("amount", e.target.value)} /></Field>
       <Field label="Date"><input style={inputStyle} type="date" value={f.date} onChange={(e) => set("date", e.target.value)} /></Field></div></Modal>);
 }
-function Finance({ customers, projects, expenses, onInvoiceStatus, onAddExpense, onDeleteExpense }) {
+function Finance({ customers, projects, proposals, expenses, onInvoiceStatus, onAddExpense, onDeleteExpense, setView }) {
   const revenue = projects.reduce((a, p) => a + (p.revenueRecognised || 0), 0);
   const outstanding = projects.reduce((a, p) => a + Math.max(0, (p.value || 0) - (p.paid || 0)), 0);
   const recurring = projects.reduce((a, p) => a + (p.retainer || 0), 0);
@@ -458,9 +482,22 @@ function Finance({ customers, projects, expenses, onInvoiceStatus, onAddExpense,
     { label: "Profit", value: gbp(profit), accent: C.cyan },
   ];
   const [showExp, setShowExp] = useState(false);
+  const exportCustomer = (c) => {
+    const cps = projects.filter((p) => p.customerId === c.id);
+    const cq = proposals.filter((q) => q.customerId === c.id);
+    const rows = [["KAITEQ finance breakdown", c.company], [], ["Projects"], ["Name", "Stage", "Value", "Paid", "Outstanding", "Retainer/mo", "Invoice status"]];
+    cps.forEach((p) => rows.push([p.name, STAGES[p.stageIdx].name, p.value, p.paid, Math.max(0, (p.value || 0) - (p.paid || 0)), p.retainer, (INVOICE_STATUS.find((s) => s.key === p.invoiceStatus) || {}).label]));
+    rows.push([], ["Quotations"], ["Title", "Value", "Status"]);
+    cq.forEach((q) => rows.push([q.title, q.value, (PROPOSAL_STATUS.find((s) => s.key === q.status) || {}).label]));
+    const rev = cps.reduce((a, p) => a + (p.revenueRecognised || 0), 0);
+    const out = cps.reduce((a, p) => a + Math.max(0, (p.value || 0) - (p.paid || 0)), 0);
+    const ret = cps.reduce((a, p) => a + (p.retainer || 0), 0);
+    rows.push([], ["Totals", "Revenue", rev, "Outstanding", out, "Retainer/mo", ret]);
+    downloadCSV("KAITEQ-" + c.company.replace(/ /g, "_") + "-finance.csv", rows);
+  };
   return (<div><Topbar title="Finance" sub="Revenue, invoices, retainers and profit — fed automatically from projects." />
     <div className="grid grid-cols-5 gap-3 mb-6">{stats.map((s) => <Stat key={s.label} {...s} />)}</div>
-    <h2 style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 12 }}>Invoices</h2>
+    <div className="flex items-center justify-between mb-3"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Invoices</h2><button onClick={() => setView("documents")} className="flex items-center gap-1" style={{ fontSize: 12, color: C.cyan }}><FileText size={13} /> Invoice templates</button></div>
     <Card style={{ padding: 0, marginBottom: 24, overflow: "hidden" }}>
       <div className="grid" style={{ gridTemplateColumns: "2fr 1.4fr 1fr 1fr 1fr 1.3fr", padding: "12px 16px", fontSize: 11, color: C.mut2, borderBottom: `1px solid ${C.line}`, letterSpacing: "0.03em" }}>
         <span>PROJECT</span><span>CUSTOMER</span><span>VALUE</span><span>PAID</span><span>OUTSTANDING</span><span>STATUS</span></div>
@@ -468,6 +505,18 @@ function Finance({ customers, projects, expenses, onInvoiceStatus, onAddExpense,
         return (<div key={p.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 1.4fr 1fr 1fr 1fr 1.3fr", padding: "12px 16px", fontSize: 13, color: C.text, borderBottom: `1px solid ${C.line}` }}>
           <span>{p.name}</span><span style={{ color: C.mut }}>{custName(customers, p.customerId)}</span><span>{gbp(p.value)}</span><span style={{ color: C.green }}>{gbp(p.paid)}</span><span style={{ color: out ? C.orange : C.mut2 }}>{gbp(out)}</span>
           <select value={p.invoiceStatus} onChange={(e) => onInvoiceStatus(p.id, e.target.value)} style={{ background: C.panel2, color: st.color, border: `1px solid ${st.color}44`, borderRadius: 6, fontSize: 12, padding: "4px 6px", outline: "none", width: "fit-content" }}>{INVOICE_STATUS.map((s) => <option key={s.key} value={s.key} style={{ color: C.text, background: C.panel2 }}>{s.label}</option>)}</select></div>); })}</div>
+    <div className="flex items-center justify-between mb-3"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Quotations</h2><button onClick={() => setView("proposals")} className="flex items-center gap-1" style={{ fontSize: 12, color: C.cyan }}><Receipt size={13} /> Quotation templates</button></div>
+    <Card style={{ padding: 0, marginBottom: 24, overflow: "hidden" }}>
+      <div className="grid" style={{ gridTemplateColumns: "2fr 1.4fr 1fr 1.2fr", padding: "12px 16px", fontSize: 11, color: C.mut2, borderBottom: `1px solid ${C.line}`, letterSpacing: "0.03em" }}><span>QUOTATION</span><span>CUSTOMER</span><span>VALUE</span><span>STATUS</span></div>
+      {proposals.map((q) => { const st = PROPOSAL_STATUS.find((s) => s.key === q.status) || PROPOSAL_STATUS[0];
+        return (<div key={q.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 1.4fr 1fr 1.2fr", padding: "12px 16px", fontSize: 13, color: C.text, borderBottom: `1px solid ${C.line}` }}>
+          <span>{q.title}</span><span style={{ color: C.mut }}>{custName(customers, q.customerId)}</span><span>{gbp(q.value)}</span><span style={{ color: st.color }}>{st.label}</span></div>); })}
+      {proposals.length === 0 && <div style={{ padding: 16, fontSize: 13, color: C.mut2 }}>No quotations yet.</div>}</Card>
+    <h2 style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 12 }}>By customer</h2>
+    <Card style={{ padding: 0, marginBottom: 24, overflow: "hidden" }}>{customers.map((c) => { const cps = projects.filter((p) => p.customerId === c.id); const rev = cps.reduce((a, p) => a + (p.revenueRecognised || 0), 0); const out = cps.reduce((a, p) => a + Math.max(0, (p.value || 0) - (p.paid || 0)), 0); const ret = cps.reduce((a, p) => a + (p.retainer || 0), 0);
+      return (<div key={c.id} className="flex items-center justify-between" style={{ padding: "12px 16px", fontSize: 13, color: C.text, borderBottom: `1px solid ${C.line}` }}>
+        <div><div style={{ fontWeight: 600 }}>{c.company}</div><div style={{ fontSize: 11, color: C.mut2 }}>{cps.length} projects · {gbp(rev)} earned · {gbp(out)} outstanding · {gbp(ret)}/mo</div></div>
+        <button onClick={() => exportCustomer(c)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: C.panel2, color: C.text, fontSize: 12, border: `1px solid ${C.line}` }}><Download size={13} /> Download breakdown</button></div>); })}</Card>
     <div className="flex items-center justify-between mb-3"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Expenses</h2><Btn onClick={() => setShowExp(true)}><Plus size={15} /> Add expense</Btn></div>
     <Card style={{ padding: 0, overflow: "hidden" }}>{expenses.map((e) => (<div key={e.id} className="flex items-center justify-between" style={{ padding: "12px 16px", fontSize: 13, color: C.text, borderBottom: `1px solid ${C.line}` }}>
       <div className="flex items-center gap-3"><Wallet size={15} style={{ color: C.amber }} /> {e.label}<span style={{ fontSize: 11, color: C.mut2 }}>{e.date}</span></div>
@@ -477,27 +526,28 @@ function Finance({ customers, projects, expenses, onInvoiceStatus, onAddExpense,
 }
 
 /* --------------------------- Tasks --------------------------- */
-function TaskModal({ projects, preset, onClose, onCreate }) {
+function TaskModal({ projects, products = [], preset, onClose, onCreate }) {
   const [f, setF] = useState({ title: "", projectId: preset || (projects[0]?.id || "internal"), type: "feature", col: "todo", assignee: "Tatenda", due: "" });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const save = () => { if (!f.title.trim()) return; onCreate({ id: "t" + Date.now(), ...f, title: f.title.trim() }); onClose(); };
   return (<Modal title="Add task" onClose={onClose} onSave={save} saveLabel="Add task">
     <Field label="Task"><input style={inputStyle} value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Build social content calendar" /></Field>
-    <Field label="Project"><select style={inputStyle} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}<option value="internal">Internal / KAITEQ</option></select></Field>
+    <Field label="Project / product"><select style={inputStyle} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}{products.map((p) => <option key={p.id} value={p.id}>{p.name} (product)</option>)}<option value="internal">Internal / KAITEQ</option></select></Field>
     <div className="grid grid-cols-2 gap-3">
       <Field label="Assignee"><select style={inputStyle} value={f.assignee} onChange={(e) => set("assignee", e.target.value)}>{TEAM.map((t) => <option key={t}>{t}</option>)}<option>Client</option></select></Field>
       <Field label="Due date"><input style={inputStyle} type="date" value={f.due} onChange={(e) => set("due", e.target.value)} /></Field>
       <Field label="Type"><select style={inputStyle} value={f.type} onChange={(e) => set("type", e.target.value)}>{TASK_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></Field>
       <Field label="Status"><select style={inputStyle} value={f.col} onChange={(e) => set("col", e.target.value)}>{COLS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select></Field></div></Modal>);
 }
-function Tasks({ projects, tasks, onMoveTask, onDeleteTask, onNew }) {
+function Tasks({ projects, products = [], tasks, onMoveTask, onDeleteTask, onNew }) {
   const [filter, setFilter] = useState("all");
   const [who, setWho] = useState("all");
+  const nameFor = (id) => id === "internal" ? "Internal / KAITEQ" : ((projects.find((p) => p.id === id) || {}).name || (products.find((p) => p.id === id) || {}).name || "—");
   let shown = filter === "all" ? tasks : tasks.filter((t) => t.projectId === filter);
   if (who !== "all") shown = shown.filter((t) => t.assignee === who);
   return (<div><Topbar title="Tasks" sub="Sprint work, bugs, client and meeting actions — across everything." action={<Btn primary onClick={() => onNew(null)}><Plus size={15} /> Add task</Btn>} />
     <div className="flex items-center gap-2 mb-4">
-      <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "7px 11px" }}><option value="all">All projects</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}<option value="internal">Internal / KAITEQ</option></select>
+      <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "7px 11px" }}><option value="all">All projects &amp; products</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}{products.map((p) => <option key={p.id} value={p.id}>{p.name} (product)</option>)}<option value="internal">Internal / KAITEQ</option></select>
       <select value={who} onChange={(e) => setWho(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "7px 11px" }}><option value="all">Everyone</option>{TEAM.map((t) => <option key={t}>{t}</option>)}<option>Client</option></select></div>
     <div className="grid grid-cols-5 gap-2.5">{COLS.map((col) => { const items = shown.filter((t) => t.col === col.key);
       return (<div key={col.key} className="rounded-xl p-2.5" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
@@ -505,7 +555,7 @@ function Tasks({ projects, tasks, onMoveTask, onDeleteTask, onNew }) {
         <div className="flex flex-col gap-2">{items.map((t) => { const type = TASK_TYPES.find((x) => x.key === t.type) || TASK_TYPES[0]; const di = dueInfo(t.due);
           return (<div key={t.id} className="rounded-lg p-2.5" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
             <div className="flex items-start justify-between gap-1"><div style={{ fontSize: 12.5, color: C.text, marginBottom: 4 }}>{t.title}</div><button onClick={() => onDeleteTask(t.id)} style={{ color: C.mut2 }}><X size={13} /></button></div>
-            <div style={{ fontSize: 10.5, color: C.mut2, marginBottom: 6 }}>{projName(projects, t.projectId)}</div>
+            <div style={{ fontSize: 10.5, color: C.mut2, marginBottom: 6 }}>{nameFor(t.projectId)}</div>
             <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-1.5"><Avatar name={t.assignee} size={15} /><Chip label={type.label} color={type.color} /></div>{di && <span style={{ fontSize: 10, color: di.color }}>{di.label}</span>}</div>
             <div className="flex gap-1">{COLS.map((c) => (<button key={c.key} onClick={() => onMoveTask(t.id, c.key)} title={"Move to " + c.label} style={{ width: 11, height: 4, borderRadius: 3, border: "none", cursor: "pointer", background: c.key === t.col ? GRAD : C.line }} />))}</div></div>); })}
           {items.length === 0 && <div style={{ fontSize: 11, color: C.mut2, padding: "4px 0" }}>—</div>}</div></div>); })}</div></div>);
@@ -685,6 +735,111 @@ function WorkflowView() {
   </div>);
 }
 
+/* --------------------------- Internal Products --------------------------- */
+function ProductModal({ product, onClose, onSave }) {
+  const [f, setF] = useState(product || { id: "prod" + Date.now(), name: "", lead: "Tatenda", health: "on", stageIdx: 0, tags: [], oneOff: 0, monthly: 0, customersActive: 0, status: "idea", notes: "" });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const save = () => { if (!f.name.trim()) return; onSave({ ...f, name: f.name.trim(), oneOff: Number(f.oneOff) || 0, monthly: Number(f.monthly) || 0, customersActive: Number(f.customersActive) || 0, stageIdx: Number(f.stageIdx), tags: Array.isArray(f.tags) ? f.tags : String(f.tags).split(",").map((t) => t.trim()).filter(Boolean) }); onClose(); };
+  const tagsStr = Array.isArray(f.tags) ? f.tags.join(", ") : f.tags;
+  return (<Modal wide title={product ? "Edit product" : "New internal product"} onClose={onClose} onSave={save} saveLabel={product ? "Save product" : "Create product"}>
+    <div className="grid grid-cols-2 gap-3">
+      <Field label="Product name"><input style={inputStyle} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Social Content Engine" /></Field>
+      <Field label="Lead"><select style={inputStyle} value={f.lead} onChange={(e) => set("lead", e.target.value)}>{TEAM.map((t) => <option key={t}>{t}</option>)}</select></Field>
+      <Field label="Stage"><select style={inputStyle} value={f.stageIdx} onChange={(e) => set("stageIdx", e.target.value)}>{STAGES.map((s, i) => <option key={s.key} value={i}>{i + 1}. {s.name}</option>)}</select></Field>
+      <Field label="Status"><select style={inputStyle} value={f.status} onChange={(e) => set("status", e.target.value)}>{PRODUCT_STATUS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></Field>
+    </div>
+    <div style={{ fontSize: 12, color: C.cyan, fontWeight: 600, marginTop: 4 }}>Monetisation</div>
+    <div className="grid grid-cols-3 gap-3">
+      <Field label="One-off price (£)"><input style={inputStyle} type="number" value={f.oneOff} onChange={(e) => set("oneOff", e.target.value)} /></Field>
+      <Field label="Monthly price (£)"><input style={inputStyle} type="number" value={f.monthly} onChange={(e) => set("monthly", e.target.value)} /></Field>
+      <Field label="Paying customers"><input style={inputStyle} type="number" value={f.customersActive} onChange={(e) => set("customersActive", e.target.value)} /></Field>
+    </div>
+    <Field label="Tags"><input style={inputStyle} value={tagsStr} onChange={(e) => set("tags", e.target.value)} placeholder="SaaS, AI" /></Field>
+    <Field label="Notes"><textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={f.notes} onChange={(e) => set("notes", e.target.value)} /></Field>
+  </Modal>);
+}
+function ProductDetail({ product, tasks, onBack, onSetStage, onMoveTask, onDelete, onEdit, onAddTask }) {
+  const p = product;
+  const ptasks = tasks.filter((t) => t.projectId === p.id);
+  const st = PRODUCT_STATUS.find((s) => s.key === p.status) || PRODUCT_STATUS[0];
+  const mrr = (p.monthly || 0) * (p.customersActive || 0);
+  return (<div>
+    <button onClick={onBack} className="flex items-center gap-1 mb-4" style={{ color: C.mut, fontSize: 13 }}><ChevronRight size={14} style={{ transform: "rotate(180deg)" }} /> All products</button>
+    <div className="flex items-start justify-between mb-5">
+      <div><div className="flex items-center gap-3"><h1 style={{ fontSize: 22, fontWeight: 600, color: C.text }}>{p.name}</h1><Chip label={st.label} color={st.color} /></div>
+        <div className="flex items-center gap-2 mt-1" style={{ fontSize: 13, color: C.mut }}><Package size={14} /> Internal product · Lead <Avatar name={p.lead} size={18} /> {p.lead}</div></div>
+      <div className="flex items-center gap-2">
+        <button onClick={() => onSetStage(p.id, p.stageIdx - 1)} disabled={p.stageIdx === 0} className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: C.panel2, color: p.stageIdx === 0 ? C.mut2 : C.text, fontSize: 13, border: `1px solid ${C.line}`, cursor: p.stageIdx === 0 ? "default" : "pointer" }}><ArrowLeft size={15} /> Previous</button>
+        <button onClick={() => onSetStage(p.id, p.stageIdx + 1)} disabled={p.stageIdx === STAGES.length - 1} className="flex items-center gap-2 rounded-lg px-4 py-2 font-semibold" style={{ background: p.stageIdx === STAGES.length - 1 ? C.panel2 : GRAD, color: p.stageIdx === STAGES.length - 1 ? C.mut2 : "#fff", fontSize: 13, cursor: p.stageIdx === STAGES.length - 1 ? "default" : "pointer" }}>Advance <ArrowRight size={15} /></button>
+        <button onClick={() => onEdit(p)} className="flex items-center justify-center rounded-lg" style={{ width: 38, height: 38, background: C.panel2, color: C.mut, border: `1px solid ${C.line}` }} title="Edit"><Pencil size={15} /></button>
+        <button onClick={() => { if (window.confirm("Delete this product?")) { onDelete(p.id); onBack(); } }} className="flex items-center justify-center rounded-lg" style={{ width: 38, height: 38, background: C.panel2, color: C.mut, border: `1px solid ${C.line}` }} title="Delete"><Trash2 size={15} /></button></div></div>
+    <div className="grid grid-cols-4 gap-4 mb-5">
+      <Stat label="One-off price" value={gbp(p.oneOff)} accent={C.cyan} />
+      <Stat label="Monthly price" value={gbp(p.monthly)} accent={C.purple} />
+      <Stat label="Paying customers" value={p.customersActive || 0} accent={C.amber} />
+      <Stat label="MRR" value={gbp(mrr)} accent={C.green} /></div>
+    <Card style={{ padding: 20, marginBottom: 20 }}>
+      <div className="flex items-center justify-between mb-4"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Development pipeline</h2><span style={{ fontSize: 12, color: C.mut }}>{progressOf(p)}% complete · click a stage to jump</span></div>
+      <div className="grid grid-cols-8 gap-1">{STAGES.map((s, i) => { const done = i < p.stageIdx, active = i === p.stageIdx;
+        return (<div key={s.key} className="text-center cursor-pointer" onClick={() => onSetStage(p.id, i)}>
+          <div className="mx-auto flex items-center justify-center rounded-full mb-2" style={{ width: 32, height: 32, background: done || active ? GRAD : C.panel2, border: done || active ? "none" : `1px solid ${C.line}`, boxShadow: active ? "0 0 0 4px rgba(0,184,255,0.16)" : "none" }}>{done ? <CircleCheck size={16} color="#fff" /> : active ? <CircleDot size={16} color="#fff" /> : <Circle size={14} color={C.mut2} />}</div>
+          <div style={{ fontSize: 9.5, lineHeight: 1.2, color: done || active ? C.text : C.mut2 }}>{s.name}</div></div>); })}</div>
+      <div className="mt-4 rounded-lg p-3" style={{ background: C.panel2 }}><div style={{ fontSize: 12, color: C.cyan, fontWeight: 600 }}>Current: {STAGES[p.stageIdx].name}</div><div style={{ fontSize: 12.5, color: C.mut, marginTop: 3 }}>{STAGES[p.stageIdx].desc}</div></div>
+      {p.notes && <div className="mt-3" style={{ fontSize: 13, color: C.mut, lineHeight: 1.6 }}>{p.notes}</div>}
+    </Card>
+    <div className="flex items-center justify-between mb-3"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Build board</h2><button onClick={() => onAddTask(p.id)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: C.panel2, color: C.text, fontSize: 12, border: `1px solid ${C.line}` }}><Plus size={13} /> Add task</button></div>
+    <div className="grid grid-cols-5 gap-2.5">{COLS.map((col) => { const items = ptasks.filter((t) => t.col === col.key);
+      return (<div key={col.key} className="rounded-xl p-2.5" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center justify-between mb-3"><span style={{ fontSize: 11, fontWeight: 600, color: col.color }}>{col.label}</span><span style={{ fontSize: 11, color: C.mut2 }}>{items.length}</span></div>
+        <div className="flex flex-col gap-2">{items.map((t) => <TaskMini key={t.id} t={t} onMove={onMoveTask} />)}{items.length === 0 && <div style={{ fontSize: 11, color: C.mut2, padding: "4px 0" }}>—</div>}</div></div>); })}</div></div>);
+}
+function Products({ products, tasks, activeProduct, setActiveProduct, onSetStage, onMoveTask, onDelete, onNew, onEdit, onAddTask }) {
+  const p = products.find((x) => x.id === activeProduct);
+  if (p) return <ProductDetail product={p} tasks={tasks} onBack={() => setActiveProduct(null)} onSetStage={onSetStage} onMoveTask={onMoveTask} onDelete={onDelete} onEdit={onEdit} onAddTask={onAddTask} />;
+  const mrrTotal = products.reduce((a, p) => a + (p.monthly || 0) * (p.customersActive || 0), 0);
+  return (<div><Topbar title="Internal Products" sub="Products we build and monetise ourselves — not requested by clients." action={<Btn primary onClick={onNew}><Plus size={15} /> New product</Btn>} />
+    <div className="grid grid-cols-3 gap-4 mb-5"><Stat label="Products" value={products.length} accent={C.cyan} /><Stat label="Live" value={products.filter((x) => x.status === "live").length} accent={C.green} /><Stat label="Total MRR" value={gbp(mrrTotal)} accent={C.purple} /></div>
+    <div className="flex flex-col gap-3">{products.map((pr) => { const st = PRODUCT_STATUS.find((s) => s.key === pr.status) || PRODUCT_STATUS[0];
+      return (<Card key={pr.id} className="cursor-pointer" style={{ padding: 18 }}><div onClick={() => setActiveProduct(pr.id)}>
+        <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-3"><span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{pr.name}</span><Chip label={st.label} color={st.color} />{(pr.tags || []).map((t) => <Chip key={t} label={t} color={C.mut} />)}</div>
+          <div className="flex items-center gap-2"><Avatar name={pr.lead} size={20} /><span style={{ fontSize: 12, color: C.mut }}>{pr.monthly ? gbp(pr.monthly) + "/mo" : gbp(pr.oneOff)}</span></div></div>
+        <div className="flex items-center justify-between mb-3"><span style={{ fontSize: 12, color: C.cyan }}>{STAGES[pr.stageIdx].name}</span><span style={{ fontSize: 12, color: C.mut2 }}>{pr.customersActive || 0} paying · {gbp((pr.monthly || 0) * (pr.customersActive || 0))} MRR</span></div>
+        <Pipeline stageIdx={pr.stageIdx} /></div></Card>); })}
+      {products.length === 0 && <Card style={{ padding: 20 }}><span style={{ color: C.mut, fontSize: 13 }}>No products yet — click “New product”.</span></Card>}</div></div>);
+}
+
+/* --------------------------- Map --------------------------- */
+function TerritoryMap({ customers, projects }) {
+  const W = 460, H = 560;
+  const B = { latMin: 49.9, latMax: 58.8, lngMin: -8.3, lngMax: 1.9 };
+  const proj = (lat, lng) => ({ x: ((lng - B.lngMin) / (B.lngMax - B.lngMin)) * W, y: H - ((lat - B.latMin) / (B.latMax - B.latMin)) * H });
+  const refs = [["London", 51.5074, -0.1278], ["Birmingham", 52.4862, -1.8904], ["Manchester", 53.4808, -2.2426], ["Leeds", 53.8008, -1.5491], ["Bristol", 51.4545, -2.5879], ["Newcastle", 54.9783, -1.6178], ["Cardiff", 51.4816, -3.1791], ["Glasgow", 55.8642, -4.2518], ["Edinburgh", 55.9533, -3.1883]];
+  const revOf = (id) => projects.filter((p) => p.customerId === id).reduce((a, p) => a + (p.revenueRecognised || 0), 0);
+  const placed = customers.map((c) => ({ c, co: coordsOf(c), rev: revOf(c.id) })).filter((x) => x.co);
+  const maxRev = Math.max(1, ...placed.map((x) => x.rev));
+  const noCoords = customers.filter((c) => !coordsOf(c));
+  return (<div><Topbar title="Map" sub="Where your customers are — and where you're winning." />
+    <div className="grid grid-cols-3 gap-5">
+      <Card className="col-span-2" style={{ padding: 18 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", maxHeight: 620, background: C.panel2, borderRadius: 12 }}>
+          {refs.map((r) => { const q = proj(r[1], r[2]); return (<g key={r[0]}><circle cx={q.x} cy={q.y} r={2.5} fill={C.mut2} /><text x={q.x + 5} y={q.y + 3} fill={C.mut2} style={{ fontSize: 9 }}>{r[0]}</text></g>); })}
+          {placed.map(({ c, co, rev }) => { const q = proj(co[0], co[1]); const rad = 8 + (rev / maxRev) * 20; const col = HEALTH[c.health] ? HEALTH[c.health].color : C.cyan;
+            return (<g key={c.id}><circle cx={q.x} cy={q.y} r={rad} fill={col} opacity={0.22} /><circle cx={q.x} cy={q.y} r={5} fill={col} /><text x={q.x + rad + 3} y={q.y + 4} fill={C.text} style={{ fontSize: 11, fontWeight: 600 }}>{c.company}</text></g>); })}
+        </svg>
+      </Card>
+      <div>
+        <h3 style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 10 }}>Customers by revenue</h3>
+        <div className="flex flex-col gap-2">{[...placed].sort((a, b) => b.rev - a.rev).map(({ c, rev }) => (<Card key={c.id} style={{ padding: 12 }}>
+          <div className="flex items-center justify-between"><span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.company}</span><RelHealth h={c.health} /></div>
+          <div className="flex items-center gap-1 mt-1" style={{ fontSize: 11, color: C.mut2 }}><MapPin size={11} /> {c.city || "—"} · {gbp(rev)} earned</div></Card>))}
+          {placed.length === 0 && <Card style={{ padding: 14 }}><span style={{ fontSize: 12, color: C.mut2 }}>No customers placed yet.</span></Card>}</div>
+        {noCoords.length > 0 && <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>No location set for: {noCoords.map((c) => c.company).join(", ")}. Add a city in the customer profile to map them.</div>}
+        <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>Marker size reflects revenue recognised. Seeded cities are placeholders — edit each customer to set the real location.</div>
+      </div>
+    </div>
+  </div>);
+}
+
 /* --------------------------- Root --------------------------- */
 export default function App() {
   const [user, setUser] = useState(null);
@@ -698,12 +853,14 @@ export default function App() {
   const [opportunities, setOpportunities] = useState(init.opportunities);
   const [discovery, setDiscovery] = useState(init.discovery);
   const [expenses, setExpenses] = useState(init.expenses);
+  const [products, setProducts] = useState(init.products);
   const [activeProject, setActiveProject] = useState(null);
+  const [activeProduct, setActiveProduct] = useState(null);
   const [modal, setModal] = useState(null);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ customers, projects, tasks, meetings, proposals, opportunities, discovery, expenses })); } catch (e) {}
-  }, [customers, projects, tasks, meetings, proposals, opportunities, discovery, expenses]);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ customers, projects, products, tasks, meetings, proposals, opportunities, discovery, expenses })); } catch (e) {}
+  }, [customers, projects, products, tasks, meetings, proposals, opportunities, discovery, expenses]);
 
   /* projects */
   const setStage = (id, idx) => setProjects((ps) => ps.map((p) => p.id === id ? { ...p, stageIdx: Math.max(0, Math.min(STAGES.length - 1, idx)) } : p));
@@ -736,18 +893,24 @@ export default function App() {
   /* expenses */
   const addExpense = (e) => setExpenses((es) => [e, ...es]);
   const deleteExpense = (id) => setExpenses((es) => es.filter((e) => e.id !== id));
+  /* products */
+  const saveProduct = (prod) => setProducts((ps) => ps.some((p) => p.id === prod.id) ? ps.map((p) => p.id === prod.id ? prod : p) : [prod, ...ps]);
+  const setProductStage = (id, idx) => setProducts((ps) => ps.map((p) => p.id === id ? { ...p, stageIdx: Math.max(0, Math.min(STAGES.length - 1, idx)) } : p));
+  const deleteProduct = (id) => { setProducts((ps) => ps.filter((p) => p.id !== id)); setTasks((ts) => ts.filter((t) => t.projectId !== id)); };
 
   if (!user) return <Login onLogin={setUser} />;
 
   return (
     <div className="flex min-h-screen" style={{ background: C.bg, fontFamily: FONT, color: C.text }}>
-      <Sidebar view={view} setView={(v) => { setView(v); setActiveProject(null); }} user={user} onLogout={() => { setUser(null); setView("dashboard"); }} />
+      <Sidebar view={view} setView={(v) => { setView(v); setActiveProject(null); setActiveProduct(null); }} user={user} onLogout={() => { setUser(null); setView("dashboard"); }} />
       <main className="flex-1 overflow-auto" style={{ padding: "28px 32px" }}>
         {view === "dashboard" && <Dashboard customers={customers} projects={projects} proposals={proposals} opportunities={opportunities} meetings={meetings} expenses={expenses} setView={setView} setActiveProject={setActiveProject} />}
-        {view === "customers" && <Customers customers={customers} projects={projects} onNew={() => setModal({ type: "customer" })} onEdit={(c) => setModal({ type: "customer", data: c })} onDelete={deleteCustomer} setActiveProject={setActiveProject} setView={setView} />}
+        {view === "customers" && <Customers customers={customers} projects={projects} opportunities={opportunities} onNew={() => setModal({ type: "customer" })} onEdit={(c) => setModal({ type: "customer", data: c })} onDelete={deleteCustomer} setActiveProject={setActiveProject} setView={setView} />}
+        {view === "products" && <Products products={products} tasks={tasks} activeProduct={activeProduct} setActiveProduct={setActiveProduct} onSetStage={setProductStage} onMoveTask={moveTask} onDelete={deleteProduct} onNew={() => setModal({ type: "product" })} onEdit={(p) => setModal({ type: "product", data: p })} onAddTask={(pid) => setModal({ type: "task", preset: pid })} />}
+        {view === "map" && <TerritoryMap customers={customers} projects={projects} />}
         {view === "projects" && <Projects customers={customers} projects={projects} tasks={tasks} discovery={discovery} activeProject={activeProject} setActiveProject={setActiveProject} onSetStage={setStage} onMoveTask={moveTask} onDelete={deleteProject} onNew={() => setModal({ type: "project" })} onEdit={(p) => setModal({ type: "project", data: p })} onAddTask={(pid) => setModal({ type: "task", preset: pid })} setView={setView} />}
-        {view === "finance" && <Finance customers={customers} projects={projects} expenses={expenses} onInvoiceStatus={setInvoiceStatus} onAddExpense={addExpense} onDeleteExpense={deleteExpense} />}
-        {view === "tasks" && <Tasks projects={projects} tasks={tasks} onMoveTask={moveTask} onDeleteTask={deleteTask} onNew={(pid) => setModal({ type: "task", preset: pid })} />}
+        {view === "finance" && <Finance customers={customers} projects={projects} proposals={proposals} expenses={expenses} onInvoiceStatus={setInvoiceStatus} onAddExpense={addExpense} onDeleteExpense={deleteExpense} setView={setView} />}
+        {view === "tasks" && <Tasks projects={projects} products={products} tasks={tasks} onMoveTask={moveTask} onDeleteTask={deleteTask} onNew={(pid) => setModal({ type: "task", preset: pid })} />}
         {view === "meetings" && <Meetings customers={customers} meetings={meetings} onUpdate={updateMeeting} onDelete={deleteMeeting} onNew={() => setModal({ type: "meeting" })} onCreateTask={taskFromMeeting} />}
         {view === "discovery" && <Discovery customers={customers} projects={projects} discovery={discovery} onAnswer={setAnswer} onMeta={setMeta} />}
         {view === "proposals" && <Proposals customers={customers} proposals={proposals} onNew={addProposal} onStatus={setProposalStatus} onDelete={deleteProposal} />}
@@ -757,8 +920,9 @@ export default function App() {
       </main>
       {modal?.type === "project" && <ProjectModal customers={customers} project={modal.data} onClose={() => setModal(null)} onSave={saveProject} />}
       {modal?.type === "customer" && <CustomerModal customer={modal.data} onClose={() => setModal(null)} onSave={saveCustomer} />}
-      {modal?.type === "task" && <TaskModal projects={projects} preset={modal.preset} onClose={() => setModal(null)} onCreate={addTask} />}
+      {modal?.type === "task" && <TaskModal projects={projects} products={products} preset={modal.preset} onClose={() => setModal(null)} onCreate={addTask} />}
       {modal?.type === "meeting" && <MeetingModal customers={customers} onClose={() => setModal(null)} onCreate={addMeeting} />}
+      {modal?.type === "product" && <ProductModal product={modal.data} onClose={() => setModal(null)} onSave={saveProduct} />}
     </div>
   );
 }
