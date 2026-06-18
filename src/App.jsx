@@ -610,18 +610,36 @@ function Meetings({ customers, meetings, onUpdate, onDelete, onNew, onCreateTask
 }
 
 /* --------------------------- Discovery --------------------------- */
-function Discovery({ customers, projects, discovery, onAnswer, onMeta, onAddQuestion, onEditQuestion, onDeleteQuestion, onMoveQuestion, onApply }) {
+function QuickClientModal({ onClose, onCreate }) {
+  const [f, setF] = useState({ company: "", industry: "", projectName: "" });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const save = () => { if (!f.company.trim()) return; onCreate({ company: f.company.trim(), industry: f.industry.trim(), projectName: f.projectName.trim() }); };
+  return (<Modal title="New client" onClose={onClose} onSave={save} saveLabel="Create & start discovery">
+    <Field label="Company name"><input style={inputStyle} value={f.company} onChange={(e) => set("company", e.target.value)} placeholder="e.g. Bright Dental" /></Field>
+    <Field label="Industry"><input style={inputStyle} value={f.industry} onChange={(e) => set("industry", e.target.value)} placeholder="e.g. Healthcare" /></Field>
+    <Field label="First project / engagement name"><input style={inputStyle} value={f.projectName} onChange={(e) => set("projectName", e.target.value)} placeholder="Defaults to ‘Company — Discovery’" /></Field>
+    <div style={{ fontSize: 12, color: C.mut2 }}>Creates the client and a project at the Discovery stage, then opens its discovery notes. You can fill in the full profile later under Customers.</div>
+  </Modal>);
+}
+function Discovery({ customers, projects, discovery, onAnswer, onMeta, onAddQuestion, onEditQuestion, onDeleteQuestion, onMoveQuestion, onApply, onAddClient }) {
   const [pid, setPid] = useState(projects[0]?.id || "");
   const [editing, setEditing] = useState(false);
   const [result, setResult] = useState("");
-  if (projects.length === 0) return (<div><Topbar title="Discovery Notes" /><Card style={{ padding: 24 }}><span style={{ color: C.mut, fontSize: 13 }}>Add a project first.</span></Card></div>);
+  const [showAdd, setShowAdd] = useState(false);
+  const createClient = (payload) => { const np = onAddClient(payload); if (np) { setPid(np); setResult(""); } setShowAdd(false); };
+  if (projects.length === 0) return (<div><Topbar title="Discovery Notes" sub="Editable questions per client, plus signals that flow into the rest of the app." />
+    <Card style={{ padding: 22 }}><div className="flex items-center justify-between"><span style={{ color: C.mut, fontSize: 13 }}>No clients yet — add your first to start a discovery.</span>
+      <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 rounded-lg px-4 py-2 font-semibold" style={{ background: GRAD, color: "#fff", fontSize: 13 }}><Plus size={15} /> New client</button></div></Card>
+    {showAdd && <QuickClientModal onClose={() => setShowAdd(false)} onCreate={createClient} />}</div>);
   const disc = discovery[pid] || { a: {}, pain: 0, cost: "" };
   const questions = getQuestions(disc);
   const answered = Object.values(disc.a || {}).filter((v) => v && v.trim()).length;
   const apply = () => { const r = onApply(pid); const bits = []; if (r.opp) bits.push("1 AI opportunity"); if (r.tasks) bits.push(r.tasks + (r.tasks === 1 ? " task" : " tasks")); if (r.advanced) bits.push("advanced to Proposal"); bits.push("customer summary updated"); setResult("Populated: " + bits.join(" · ")); };
   return (<div><Topbar title="Discovery Notes" sub="Editable questions per client, plus signals that flow into the rest of the app." />
     <div className="flex items-center justify-between mb-4">
-      <select value={pid} onChange={(e) => { setPid(e.target.value); setResult(""); }} style={{ ...inputStyle, width: "auto", padding: "8px 12px" }}>{projects.map((p) => <option key={p.id} value={p.id}>{custName(customers, p.customerId)} — {p.name}</option>)}</select>
+      <div className="flex items-center gap-2">
+        <select value={pid} onChange={(e) => { setPid(e.target.value); setResult(""); }} style={{ ...inputStyle, width: "auto", padding: "8px 12px" }}>{projects.map((p) => <option key={p.id} value={p.id}>{custName(customers, p.customerId)} — {p.name}</option>)}</select>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-2" style={{ background: C.panel2, color: C.text, fontSize: 12.5, border: `1px solid ${C.line}` }}><Plus size={14} /> New client</button></div>
       <div className="flex items-center gap-3"><span style={{ fontSize: 12, color: answered === questions.length ? C.green : C.mut }}>{answered}/{questions.length} answered</span>
         <button onClick={() => setEditing((v) => !v)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: editing ? GRAD : C.panel2, color: editing ? "#fff" : C.text, fontSize: 12, border: editing ? "none" : `1px solid ${C.line}` }}><Pencil size={13} /> {editing ? "Done editing" : "Edit questions"}</button></div></div>
 
@@ -655,7 +673,8 @@ function Discovery({ customers, projects, discovery, onAnswer, onMeta, onAddQues
         </div>) : (<span style={{ fontSize: 13.5, color: C.text, fontWeight: 500 }}>{q.q || "Untitled question"}</span>)}</div>
       <textarea value={(disc.a || {})[q.id] || ""} onChange={(e) => onAnswer(pid, q.id, e.target.value)} placeholder="Type the client's answer…" rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} /></Card>))}
       {questions.length === 0 && <Card style={{ padding: 20 }}><span style={{ color: C.mut, fontSize: 13 }}>No questions — add one above.</span></Card>}</div>
-    <div style={{ fontSize: 12, color: C.mut2, marginTop: 12 }}>Questions and answers are saved per client, automatically. Editing questions here only changes them for this project.</div></div>);
+    <div style={{ fontSize: 12, color: C.mut2, marginTop: 12 }}>Questions and answers are saved per client, automatically. Editing questions here only changes them for this project.</div>
+    {showAdd && <QuickClientModal onClose={() => setShowAdd(false)} onCreate={createClient} />}</div>);
 }
 
 /* --------------------------- Proposals --------------------------- */
@@ -927,8 +946,14 @@ export default function App() {
   const editQuestion = (pid, qid, text) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = getQuestions(cur).map((x) => x.id === qid ? { ...x, q: text } : x); return { ...d, [pid]: { ...cur, questions: qs } }; });
   const deleteQuestion = (pid, qid) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = getQuestions(cur).filter((x) => x.id !== qid); const a = { ...(cur.a || {}) }; delete a[qid]; return { ...d, [pid]: { ...cur, questions: qs, a } }; });
   const moveQuestion = (pid, qid, dir) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = [...getQuestions(cur)]; const i = qs.findIndex((x) => x.id === qid); const j = i + dir; if (i < 0 || j < 0 || j >= qs.length) return d; const t = qs[i]; qs[i] = qs[j]; qs[j] = t; return { ...d, [pid]: { ...cur, questions: qs } }; });
-  const applyDiscovery = (pid) => {
-    const p = projects.find((x) => x.id === pid); if (!p) return { tasks: 0, opp: false, advanced: false };
+  const addClientWithProject = ({ company, industry, projectName }) => {
+    const cid = "c" + Date.now(); const pid = "p" + Date.now();
+    const cust = { id: cid, company, industry: industry || "", website: "", status: "Discovery", health: "attention", contacts: { owner: "", manager: "", accounts: "", technical: "" }, services: [], notes: "" };
+    const proj = { id: pid, customerId: cid, name: projectName || (company + " — Discovery"), lead: "Tatenda", health: "on", stageIdx: 1, tags: [], value: 0, paid: 0, retainer: 0, revenueRecognised: 0, invoiceStatus: "none" };
+    setCustomers((cs) => [cust, ...cs]); setProjects((ps) => [proj, ...ps]);
+    return pid;
+  };
+  const applyDiscovery = (pid) => {    const p = projects.find((x) => x.id === pid); if (!p) return { tasks: 0, opp: false, advanced: false };
     const disc = discovery[pid] || {};
     const qs = getQuestions(disc);
     const lines = qs.filter((q) => (disc.a || {})[q.id] && disc.a[q.id].trim()).map((q) => "• " + q.q + " — " + disc.a[q.id].trim());
@@ -981,7 +1006,7 @@ export default function App() {
         {view === "finance" && <Finance customers={customers} projects={projects} proposals={proposals} expenses={expenses} onInvoiceStatus={setInvoiceStatus} onAddExpense={addExpense} onDeleteExpense={deleteExpense} setView={setView} />}
         {view === "tasks" && <Tasks projects={projects} products={products} tasks={tasks} onMoveTask={moveTask} onDeleteTask={deleteTask} onNew={(pid) => setModal({ type: "task", preset: pid })} />}
         {view === "meetings" && <Meetings customers={customers} meetings={meetings} onUpdate={updateMeeting} onDelete={deleteMeeting} onNew={() => setModal({ type: "meeting" })} onCreateTask={taskFromMeeting} />}
-        {view === "discovery" && <Discovery customers={customers} projects={projects} discovery={discovery} onAnswer={setAnswer} onMeta={setMeta} onAddQuestion={addQuestion} onEditQuestion={editQuestion} onDeleteQuestion={deleteQuestion} onMoveQuestion={moveQuestion} onApply={applyDiscovery} />}
+        {view === "discovery" && <Discovery customers={customers} projects={projects} discovery={discovery} onAnswer={setAnswer} onMeta={setMeta} onAddQuestion={addQuestion} onEditQuestion={editQuestion} onDeleteQuestion={deleteQuestion} onMoveQuestion={moveQuestion} onApply={applyDiscovery} onAddClient={addClientWithProject} />}
         {view === "proposals" && <Proposals customers={customers} proposals={proposals} onNew={addProposal} onStatus={setProposalStatus} onDelete={deleteProposal} />}
         {view === "ai" && <AIOpportunities customers={customers} opportunities={opportunities} onNew={addOpp} onStatus={setOppStatus} onDelete={deleteOpp} />}
         {view === "documents" && <Documents customers={customers} />}
