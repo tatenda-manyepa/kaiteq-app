@@ -81,6 +81,9 @@ const DISCOVERY_QUESTIONS = [
   "What's the urgency and timeline?",
   "What risks, constraints or compliance needs exist?",
 ];
+/* default question set; ids match the legacy numeric answer keys so existing notes stay aligned */
+const defaultQuestions = () => DISCOVERY_QUESTIONS.map((q, i) => ({ id: String(i), q }));
+const getQuestions = (disc) => (disc && Array.isArray(disc.questions) && disc.questions.length) ? disc.questions : defaultQuestions();
 const DEV_FLOW = ["Idea", "Backlog", "Design", "Build", "Test", "Deploy", "Improve"];
 
 /* --------------------------- Seed data (your real clients) --------------------------- */
@@ -363,7 +366,9 @@ function Customers({ customers, projects, opportunities = [], onNew, onEdit, onD
           <div className="flex flex-col gap-2">{opps.map((o) => (<div key={o.id} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
             <div className="flex items-center gap-2"><Lightbulb size={14} style={{ color: C.amber }} /><span style={{ fontSize: 13, color: C.text }}>{o.idea}</span></div>
             <div className="flex items-center gap-3">{(o.projectValue || o.monthly) ? <span style={{ fontSize: 12, color: C.green }}>{o.projectValue ? gbp(o.projectValue) : ""}{o.monthly ? " +" + gbp(o.monthly) + "/mo" : ""}</span> : null}<PriorityPill o={o} /></div></div>))}
-            {opps.length === 0 && <div style={{ fontSize: 12, color: C.mut2 }}>No AI opportunities yet — add them in the AI Opportunities section.</div>}</div></Card></div></div>);
+            {opps.length === 0 && <div style={{ fontSize: 12, color: C.mut2 }}>No AI opportunities yet — add them in the AI Opportunities section.</div>}</div>
+          {c.discoverySummary && (<><h3 style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: "16px 0 8px" }}>Discovery summary</h3>
+            <div className="rounded-lg p-3" style={{ background: C.panel2, border: `1px solid ${C.line}`, fontSize: 12.5, color: C.mut, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{c.discoverySummary}</div></>)}</Card></div></div>);
   }
   return (<div><Topbar title="Customers" sub="Company profiles, contacts, revenue and relationship health." action={<Btn primary onClick={onNew}><Plus size={15} /> Add customer</Btn>} />
     <div className="grid grid-cols-3 gap-4">{customers.map((c) => { const ps = custProjects(c.id); const rev = ps.reduce((a, p) => a + (p.revenueRecognised || 0), 0);
@@ -411,6 +416,7 @@ function ProjectDetail({ project, customers, tasks, discovery, onBack, onSetStag
   const ptasks = tasks.filter((t) => t.projectId === p.id);
   const outstanding = Math.max(0, (p.value || 0) - (p.paid || 0));
   const disc = discovery[p.id];
+  const discTotal = getQuestions(disc).length;
   const answered = disc ? Object.values(disc.a || {}).filter((v) => v && v.trim()).length : 0;
   const inv = INVOICE_STATUS.find((s) => s.key === p.invoiceStatus) || INVOICE_STATUS[0];
   return (<div>
@@ -437,7 +443,7 @@ function ProjectDetail({ project, customers, tasks, discovery, onBack, onSetStag
           <div className="mx-auto flex items-center justify-center rounded-full mb-2" style={{ width: 32, height: 32, background: done || active ? GRAD : C.panel2, border: done || active ? "none" : `1px solid ${C.line}`, boxShadow: active ? "0 0 0 4px rgba(0,184,255,0.16)" : "none" }}>{done ? <CircleCheck size={16} color="#fff" /> : active ? <CircleDot size={16} color="#fff" /> : <Circle size={14} color={C.mut2} />}</div>
           <div style={{ fontSize: 9.5, lineHeight: 1.2, color: done || active ? C.text : C.mut2 }}>{s.name}</div></div>); })}</div>
       <div className="mt-4 rounded-lg p-3" style={{ background: C.panel2 }}><div style={{ fontSize: 12, color: C.cyan, fontWeight: 600 }}>Current: {STAGES[p.stageIdx].name}</div><div style={{ fontSize: 12.5, color: C.mut, marginTop: 3 }}>{STAGES[p.stageIdx].desc}</div></div>
-      {answered > 0 && <button onClick={() => setView("discovery")} className="flex items-center gap-1.5 mt-3" style={{ fontSize: 12, color: C.cyan }}><ClipboardList size={13} /> Discovery: {answered}/{DISCOVERY_QUESTIONS.length} captured{disc?.pain ? ` · pain ${disc.pain}/10` : ""}</button>}
+      {answered > 0 && <button onClick={() => setView("discovery")} className="flex items-center gap-1.5 mt-3" style={{ fontSize: 12, color: C.cyan }}><ClipboardList size={13} /> Discovery: {answered}/{discTotal} captured{disc?.pain ? ` · pain ${disc.pain}/10` : ""}</button>}
     </Card>
     <div className="flex items-center justify-between mb-3"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Build board</h2><button onClick={() => onAddTask(p.id)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: C.panel2, color: C.text, fontSize: 12, border: `1px solid ${C.line}` }}><Plus size={13} /> Add task</button></div>
     <div className="grid grid-cols-5 gap-2.5">{COLS.map((col) => { const items = ptasks.filter((t) => t.col === col.key);
@@ -604,25 +610,52 @@ function Meetings({ customers, meetings, onUpdate, onDelete, onNew, onCreateTask
 }
 
 /* --------------------------- Discovery --------------------------- */
-function Discovery({ customers, projects, discovery, onAnswer, onMeta }) {
+function Discovery({ customers, projects, discovery, onAnswer, onMeta, onAddQuestion, onEditQuestion, onDeleteQuestion, onMoveQuestion, onApply }) {
   const [pid, setPid] = useState(projects[0]?.id || "");
+  const [editing, setEditing] = useState(false);
+  const [result, setResult] = useState("");
   if (projects.length === 0) return (<div><Topbar title="Discovery Notes" /><Card style={{ padding: 24 }}><span style={{ color: C.mut, fontSize: 13 }}>Add a project first.</span></Card></div>);
   const disc = discovery[pid] || { a: {}, pain: 0, cost: "" };
+  const questions = getQuestions(disc);
   const answered = Object.values(disc.a || {}).filter((v) => v && v.trim()).length;
-  return (<div><Topbar title="Discovery Notes" sub="Structured questions, pain score and the cost of the problem — per client." />
-    <div className="flex items-center justify-between mb-5">
-      <select value={pid} onChange={(e) => setPid(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "8px 12px" }}>{projects.map((p) => <option key={p.id} value={p.id}>{custName(customers, p.customerId)} — {p.name}</option>)}</select>
-      <span style={{ fontSize: 12, color: answered === DISCOVERY_QUESTIONS.length ? C.green : C.mut }}>{answered}/{DISCOVERY_QUESTIONS.length} answered</span></div>
+  const apply = () => { const r = onApply(pid); const bits = []; if (r.opp) bits.push("1 AI opportunity"); if (r.tasks) bits.push(r.tasks + (r.tasks === 1 ? " task" : " tasks")); if (r.advanced) bits.push("advanced to Proposal"); bits.push("customer summary updated"); setResult("Populated: " + bits.join(" · ")); };
+  return (<div><Topbar title="Discovery Notes" sub="Editable questions per client, plus signals that flow into the rest of the app." />
+    <div className="flex items-center justify-between mb-4">
+      <select value={pid} onChange={(e) => { setPid(e.target.value); setResult(""); }} style={{ ...inputStyle, width: "auto", padding: "8px 12px" }}>{projects.map((p) => <option key={p.id} value={p.id}>{custName(customers, p.customerId)} — {p.name}</option>)}</select>
+      <div className="flex items-center gap-3"><span style={{ fontSize: 12, color: answered === questions.length ? C.green : C.mut }}>{answered}/{questions.length} answered</span>
+        <button onClick={() => setEditing((v) => !v)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: editing ? GRAD : C.panel2, color: editing ? "#fff" : C.text, fontSize: 12, border: editing ? "none" : `1px solid ${C.line}` }}><Pencil size={13} /> {editing ? "Done editing" : "Edit questions"}</button></div></div>
+
     <div className="grid grid-cols-2 gap-4 mb-4">
       <Card style={{ padding: 16 }}><div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Pain score</div>
         <div className="flex items-center gap-1.5">{Array.from({ length: 10 }).map((_, i) => (<button key={i} onClick={() => onMeta(pid, "pain", i + 1)} style={{ width: 22, height: 22, borderRadius: 5, border: "none", cursor: "pointer", color: "#fff", fontSize: 11, background: i < (disc.pain || 0) ? (disc.pain >= 7 ? C.red : disc.pain >= 4 ? C.amber : C.green) : C.line }}>{i + 1}</button>))}</div>
         <div style={{ fontSize: 11, color: C.mut2, marginTop: 8 }}>How painful is this problem? Higher = prioritise the proposal.</div></Card>
       <Card style={{ padding: 16 }}><div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Current cost of the problem</div>
         <textarea rows={2} value={disc.cost || ""} onChange={(e) => onMeta(pid, "cost", e.target.value)} placeholder="How much time or money is this costing today?" style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} /></Card></div>
-    <div className="flex flex-col gap-3">{DISCOVERY_QUESTIONS.map((q, i) => (<Card key={i} style={{ padding: 16 }}>
-      <div className="flex items-start gap-2 mb-2"><span style={{ fontSize: 12, color: C.cyan, fontWeight: 700, marginTop: 1 }}>{i + 1}</span><span style={{ fontSize: 13.5, color: C.text, fontWeight: 500 }}>{q}</span></div>
-      <textarea value={(disc.a || {})[i] || ""} onChange={(e) => onAnswer(pid, i, e.target.value)} placeholder="Type the client's answer…" rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} /></Card>))}</div>
-    <div style={{ fontSize: 12, color: C.mut2, marginTop: 12 }}>Everything saves automatically as you type.</div></div>);
+
+    <Card style={{ padding: 18, marginBottom: 20 }}>
+      <div className="flex items-center justify-between mb-3"><div><div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>Turn this discovery into the rest of the app</div>
+        <div style={{ fontSize: 11.5, color: C.mut2, marginTop: 2 }}>Fill these in, then populate — it creates an AI opportunity, tasks and a customer summary, and moves the project to Proposal.</div></div>
+        <button onClick={apply} className="flex items-center gap-2 rounded-lg px-4 py-2 font-semibold" style={{ background: GRAD, color: "#fff", fontSize: 13 }}><Sparkles size={15} /> Populate app</button></div>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <Field label="Budget / project value (£)"><input style={inputStyle} type="number" value={disc.budget || ""} onChange={(e) => onMeta(pid, "budget", e.target.value)} placeholder="e.g. 2000" /></Field>
+        <Field label="Monthly potential (£)"><input style={inputStyle} type="number" value={disc.monthly || ""} onChange={(e) => onMeta(pid, "monthly", e.target.value)} placeholder="e.g. 250" /></Field></div>
+      <Field label="Automation / AI opportunity spotted"><input style={inputStyle} value={disc.opp || ""} onChange={(e) => onMeta(pid, "opp", e.target.value)} placeholder="e.g. AI social content engine with scheduling" /></Field>
+      <div className="mt-3"><Field label="Agreed next actions (one per line → becomes tasks)"><textarea rows={3} value={disc.actions || ""} onChange={(e) => onMeta(pid, "actions", e.target.value)} placeholder={"Send proposal by Friday\nCollect brand assets from client\nDraft content calendar"} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} /></Field></div>
+      {result && <div style={{ fontSize: 12.5, color: C.green, marginTop: 12 }}>{result}</div>}
+    </Card>
+
+    {editing && <button onClick={() => onAddQuestion(pid)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 mb-3" style={{ background: C.panel2, color: C.text, fontSize: 12.5, border: `1px dashed ${C.line}` }}><Plus size={14} /> Add question</button>}
+    <div className="flex flex-col gap-3">{questions.map((q, i) => (<Card key={q.id} style={{ padding: 16 }}>
+      <div className="flex items-start gap-2 mb-2"><span style={{ fontSize: 12, color: C.cyan, fontWeight: 700, marginTop: 9 }}>{i + 1}</span>
+        {editing ? (<div className="flex items-center gap-1.5 flex-1">
+          <input value={q.q} onChange={(e) => onEditQuestion(pid, q.id, e.target.value)} placeholder="Question text…" style={{ ...inputStyle, fontWeight: 500 }} />
+          <button onClick={() => onMoveQuestion(pid, q.id, -1)} disabled={i === 0} className="flex items-center justify-center rounded-lg" style={{ width: 32, height: 32, background: C.panel2, color: i === 0 ? C.mut2 : C.mut, border: `1px solid ${C.line}` }} title="Move up"><ArrowLeft size={14} style={{ transform: "rotate(90deg)" }} /></button>
+          <button onClick={() => onMoveQuestion(pid, q.id, 1)} disabled={i === questions.length - 1} className="flex items-center justify-center rounded-lg" style={{ width: 32, height: 32, background: C.panel2, color: i === questions.length - 1 ? C.mut2 : C.mut, border: `1px solid ${C.line}` }} title="Move down"><ArrowLeft size={14} style={{ transform: "rotate(-90deg)" }} /></button>
+          <button onClick={() => onDeleteQuestion(pid, q.id)} className="flex items-center justify-center rounded-lg" style={{ width: 32, height: 32, background: C.panel2, color: C.mut, border: `1px solid ${C.line}` }} title="Delete question"><Trash2 size={14} /></button>
+        </div>) : (<span style={{ fontSize: 13.5, color: C.text, fontWeight: 500 }}>{q.q || "Untitled question"}</span>)}</div>
+      <textarea value={(disc.a || {})[q.id] || ""} onChange={(e) => onAnswer(pid, q.id, e.target.value)} placeholder="Type the client's answer…" rows={2} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} /></Card>))}
+      {questions.length === 0 && <Card style={{ padding: 20 }}><span style={{ color: C.mut, fontSize: 13 }}>No questions — add one above.</span></Card>}</div>
+    <div style={{ fontSize: 12, color: C.mut2, marginTop: 12 }}>Questions and answers are saved per client, automatically. Editing questions here only changes them for this project.</div></div>);
 }
 
 /* --------------------------- Proposals --------------------------- */
@@ -890,6 +923,42 @@ export default function App() {
   /* discovery */
   const setAnswer = (pid, i, text) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; return { ...d, [pid]: { ...cur, a: { ...(cur.a || {}), [i]: text } } }; });
   const setMeta = (pid, key, val) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; return { ...d, [pid]: { ...cur, [key]: val } }; });
+  const addQuestion = (pid) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = getQuestions(cur); return { ...d, [pid]: { ...cur, questions: [...qs, { id: "q" + Date.now(), q: "" }] } }; });
+  const editQuestion = (pid, qid, text) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = getQuestions(cur).map((x) => x.id === qid ? { ...x, q: text } : x); return { ...d, [pid]: { ...cur, questions: qs } }; });
+  const deleteQuestion = (pid, qid) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = getQuestions(cur).filter((x) => x.id !== qid); const a = { ...(cur.a || {}) }; delete a[qid]; return { ...d, [pid]: { ...cur, questions: qs, a } }; });
+  const moveQuestion = (pid, qid, dir) => setDiscovery((d) => { const cur = d[pid] || { a: {}, pain: 0, cost: "" }; const qs = [...getQuestions(cur)]; const i = qs.findIndex((x) => x.id === qid); const j = i + dir; if (i < 0 || j < 0 || j >= qs.length) return d; const t = qs[i]; qs[i] = qs[j]; qs[j] = t; return { ...d, [pid]: { ...cur, questions: qs } }; });
+  const applyDiscovery = (pid) => {
+    const p = projects.find((x) => x.id === pid); if (!p) return { tasks: 0, opp: false, advanced: false };
+    const disc = discovery[pid] || {};
+    const qs = getQuestions(disc);
+    const lines = qs.filter((q) => (disc.a || {})[q.id] && disc.a[q.id].trim()).map((q) => "• " + q.q + " — " + disc.a[q.id].trim());
+    if (disc.pain) lines.push("• Pain score: " + disc.pain + "/10");
+    if (disc.cost) lines.push("• Cost of the problem: " + disc.cost);
+    if (disc.budget) lines.push("• Budget / value: " + gbp(disc.budget));
+    const summary = lines.join("\n");
+    setCustomers((cs) => cs.map((x) => x.id === p.customerId ? { ...x, discoverySummary: summary } : x));
+    /* AI opportunity (create once, then update) */
+    let oppId = disc.oppId; const hasOpp = disc.opp && disc.opp.trim();
+    if (hasOpp) {
+      if (oppId && opportunities.some((o) => o.id === oppId)) {
+        setOpportunities((os) => os.map((o) => o.id === oppId ? { ...o, idea: disc.opp.trim(), projectValue: Number(disc.budget) || o.projectValue || 0, monthly: Number(disc.monthly) || o.monthly || 0 } : o));
+      } else {
+        oppId = "o" + Date.now();
+        const newOpp = { id: oppId, customerId: p.customerId, idea: disc.opp.trim(), value: 4, effort: 3, risk: 2, status: "idea", estValue: disc.cost ? "From discovery" : "", projectValue: Number(disc.budget) || 0, monthly: Number(disc.monthly) || 0 };
+        setOpportunities((os) => [newOpp, ...os]);
+      }
+    }
+    /* tasks from next actions (dedup against ones already created) */
+    const made = disc.madeActions || [];
+    const actionLines = (disc.actions || "").split("\n").map((s) => s.trim()).filter(Boolean);
+    const newLines = actionLines.filter((l) => !made.includes(l));
+    if (newLines.length) { const newTasks = newLines.map((l, k) => ({ id: "t" + Date.now() + k, title: l, projectId: p.id, type: "internal", col: "todo", assignee: p.lead, due: "" })); setTasks((ts) => [...newTasks, ...ts]); }
+    /* project value + stage */
+    const willAdvance = p.stageIdx < 2;
+    setProjects((ps) => ps.map((x) => { if (x.id !== p.id) return x; const value = (!x.value && Number(disc.budget)) ? Number(disc.budget) : x.value; return { ...x, value, stageIdx: x.stageIdx < 2 ? 2 : x.stageIdx }; }));
+    setDiscovery((d) => { const cur = d[pid] || {}; return { ...d, [pid]: { ...cur, oppId, madeActions: [...made, ...newLines] } }; });
+    return { tasks: newLines.length, opp: !!hasOpp, advanced: willAdvance };
+  };
   /* expenses */
   const addExpense = (e) => setExpenses((es) => [e, ...es]);
   const deleteExpense = (id) => setExpenses((es) => es.filter((e) => e.id !== id));
@@ -912,7 +981,7 @@ export default function App() {
         {view === "finance" && <Finance customers={customers} projects={projects} proposals={proposals} expenses={expenses} onInvoiceStatus={setInvoiceStatus} onAddExpense={addExpense} onDeleteExpense={deleteExpense} setView={setView} />}
         {view === "tasks" && <Tasks projects={projects} products={products} tasks={tasks} onMoveTask={moveTask} onDeleteTask={deleteTask} onNew={(pid) => setModal({ type: "task", preset: pid })} />}
         {view === "meetings" && <Meetings customers={customers} meetings={meetings} onUpdate={updateMeeting} onDelete={deleteMeeting} onNew={() => setModal({ type: "meeting" })} onCreateTask={taskFromMeeting} />}
-        {view === "discovery" && <Discovery customers={customers} projects={projects} discovery={discovery} onAnswer={setAnswer} onMeta={setMeta} />}
+        {view === "discovery" && <Discovery customers={customers} projects={projects} discovery={discovery} onAnswer={setAnswer} onMeta={setMeta} onAddQuestion={addQuestion} onEditQuestion={editQuestion} onDeleteQuestion={deleteQuestion} onMoveQuestion={moveQuestion} onApply={applyDiscovery} />}
         {view === "proposals" && <Proposals customers={customers} proposals={proposals} onNew={addProposal} onStatus={setProposalStatus} onDelete={deleteProposal} />}
         {view === "ai" && <AIOpportunities customers={customers} opportunities={opportunities} onNew={addOpp} onStatus={setOppStatus} onDelete={deleteOpp} />}
         {view === "documents" && <Documents customers={customers} />}
