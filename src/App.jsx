@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, FolderKanban, ListChecks, CalendarDays, Users, ClipboardList,
   Receipt, Sparkles, FileText, Workflow, LogOut, Plus, Clock, CircleCheck, CircleDot,
@@ -71,6 +71,9 @@ const OPP_STATUS = [
   { key: "delivered", label: "Delivered", color: C.green },
 ];
 const HEALTH = { healthy: { label: "Healthy", color: C.green }, attention: { label: "Needs attention", color: C.amber }, risk: { label: "At risk", color: C.red } };
+const SOURCES = ["Referral", "Social media", "Website", "Networking", "Repeat client", "Other"];
+const SOURCE_COLOR = { "Referral": C.green, "Social media": C.cyan, "Website": C.blue, "Networking": C.purple, "Repeat client": C.amber, "Other": C.mut2 };
+const STATUS_COLOR = { "Lead": C.mut2, "Discovery": C.cyan, "Proposal": C.blue, "Active": C.green, "Retainer": C.purple, "Closed": C.mut };
 const DISCOVERY_QUESTIONS = [
   "What problem are we solving, in the client's own words?",
   "What's the current process, and which tools do they use?",
@@ -180,7 +183,18 @@ function Logo({ size = 34 }) {
     <rect x="6" y="6" width="88" height="88" rx="22" fill={`url(#${id})`} opacity="0.16" />
     <g fill={`url(#${id})`}><rect x="26" y="20" width="13" height="60" rx="3" /><polygon points="44,50 66,20 80,20 56,52" /><polygon points="56,52 80,80 65,80 47,56" /></g></svg>);
 }
-function Wordmark() { return (<div className="flex items-center gap-3"><Logo size={30} /><span style={{ letterSpacing: "0.28em", fontWeight: 600, color: C.text, fontSize: 18 }}>KAITEQ</span></div>); }
+/* Tight gradient K glyph (no box) used as the first letter of the wordmark */
+function KMark({ size = 22 }) {
+  const id = "kw" + size;
+  return (<svg width={Math.round(size * 0.84)} height={size} viewBox="24 16 60 68" xmlns="http://www.w3.org/2000/svg" aria-hidden style={{ display: "block", flex: "none" }}>
+    <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={C.cyan} /><stop offset="50%" stopColor={C.blue} /><stop offset="100%" stopColor={C.purple} /></linearGradient></defs>
+    <g fill={`url(#${id})`}><rect x="26" y="20" width="13" height="60" rx="3" /><polygon points="44,50 66,20 80,20 56,52" /><polygon points="56,52 80,80 65,80 47,56" /></g></svg>);
+}
+function Wordmark({ size = 18 }) {
+  return (<div className="flex items-center" style={{ gap: Math.round(size * 0.2) }}>
+    <KMark size={size} />
+    <span style={{ letterSpacing: "0.26em", fontWeight: 600, color: C.text, fontSize: size }}>AITEQ</span></div>);
+}
 function Avatar({ name, size = 26 }) {
   const initial = (name || "?").slice(0, 1);
   const grad = name === "Tatenda" ? `linear-gradient(135deg,${C.cyan},${C.blue})` : name === "Kudzai" ? `linear-gradient(135deg,${C.blue},${C.purple})` : `linear-gradient(135deg,${C.mut2},${C.mut})`;
@@ -235,8 +249,8 @@ function Login({ onLogin }) {
   return (<div className="min-h-screen flex items-center justify-center px-4" style={{ background: C.bg, fontFamily: FONT }}>
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", background: `radial-gradient(600px 400px at 30% 20%, rgba(0,184,255,0.10), transparent 60%), radial-gradient(600px 500px at 80% 90%, rgba(123,60,255,0.12), transparent 60%)` }} />
     <div className="w-full max-w-md rounded-2xl p-8 relative" style={{ background: C.panel, border: `1px solid ${C.line}`, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }}>
-      <div className="flex flex-col items-center text-center mb-7"><Logo size={52} /><div style={{ letterSpacing: "0.3em", fontWeight: 600, fontSize: 22, color: C.text, marginTop: 14 }}>KAITEQ</div>
-        <div style={{ letterSpacing: "0.18em", fontSize: 10, color: C.cyan, marginTop: 4 }}>OPERATIONAL INTELLIGENCE & AUTOMATION</div></div>
+      <div className="flex flex-col items-center text-center mb-7"><Wordmark size={30} />
+        <div style={{ letterSpacing: "0.18em", fontSize: 10, color: C.cyan, marginTop: 12 }}>OPERATIONAL INTELLIGENCE & AUTOMATION</div></div>
       <label style={{ fontSize: 12, color: C.mut }}>Work email</label>
       <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tatenda@kaiteq.com" className="w-full rounded-lg px-3 py-2.5 mt-1.5 mb-4 outline-none" style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, fontSize: 14 }} />
       <label style={{ fontSize: 12, color: C.mut }}>Password</label>
@@ -302,7 +316,7 @@ function Dashboard({ customers, projects, proposals, opportunities, meetings, ex
 
 /* --------------------------- Customers --------------------------- */
 function CustomerModal({ customer, onClose, onSave }) {
-  const [f, setF] = useState(customer || { id: "c" + Date.now(), company: "", industry: "", website: "", status: "Discovery", health: "healthy", contacts: { owner: "", manager: "", accounts: "", technical: "" }, services: [], notes: "" });
+  const [f, setF] = useState(customer || { id: "c" + Date.now(), company: "", industry: "", website: "", status: "Discovery", health: "healthy", source: "Referral", contacts: { owner: "", manager: "", accounts: "", technical: "" }, services: [], notes: "" });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const setC = (k, v) => setF((s) => ({ ...s, contacts: { ...s.contacts, [k]: v } }));
   const save = () => { if (!f.company.trim()) return; onSave({ ...f, company: f.company.trim(), services: Array.isArray(f.services) ? f.services : String(f.services).split(",").map((x) => x.trim()).filter(Boolean) }); onClose(); };
@@ -314,6 +328,7 @@ function CustomerModal({ customer, onClose, onSave }) {
       <Field label="Website"><input style={inputStyle} value={f.website} onChange={(e) => set("website", e.target.value)} placeholder="example.co.uk" /></Field>
       <Field label="Status"><select style={inputStyle} value={f.status} onChange={(e) => set("status", e.target.value)}>{["Lead", "Discovery", "Proposal", "Active", "Retainer", "Closed"].map((s) => <option key={s}>{s}</option>)}</select></Field>
       <Field label="Relationship health"><select style={inputStyle} value={f.health} onChange={(e) => set("health", e.target.value)}>{Object.keys(HEALTH).map((k) => <option key={k} value={k}>{HEALTH[k].label}</option>)}</select></Field>
+      <Field label="How we won them (source)"><select style={inputStyle} value={f.source || "Other"} onChange={(e) => set("source", e.target.value)}>{SOURCES.map((s) => <option key={s}>{s}</option>)}</select></Field>
       <Field label="Services (comma separated)"><input style={inputStyle} value={servicesStr} onChange={(e) => set("services", e.target.value)} placeholder="Website, Branding" /></Field>
     </div>
     <div className="grid grid-cols-3 gap-3">
@@ -351,7 +366,7 @@ function Customers({ customers, projects, opportunities = [], onNew, onEdit, onD
         <Stat label="Retainer / mo" value={gbp(retainer)} accent={C.purple} /></div>
       <div className="grid grid-cols-3 gap-5">
         <Card style={{ padding: 18 }}><h3 style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}>Profile</h3>
-          {[["Website", c.website], ["Owner", c.contacts.owner], ["Manager", c.contacts.manager], ["Accounts", c.contacts.accounts], ["Technical", c.contacts.technical]].map(([k, v]) => (
+          {[["Website", c.website], ["Source", c.source], ["Owner", c.contacts.owner], ["Manager", c.contacts.manager], ["Accounts", c.contacts.accounts], ["Technical", c.contacts.technical]].map(([k, v]) => (
             <div key={k} className="flex justify-between mb-2.5" style={{ fontSize: 12.5 }}><span style={{ color: C.mut2 }}>{k}</span><span style={{ color: C.text }}>{v || "—"}</span></div>))}
           <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}><div style={{ fontSize: 12, color: C.mut2, marginBottom: 6 }}>Services</div>
             <div className="flex flex-wrap gap-1.5">{(c.services || []).map((s) => <Chip key={s} label={s} color={C.cyan} />)}</div></div></Card>
@@ -510,7 +525,7 @@ function Finance({ customers, projects, proposals, expenses, onInvoiceStatus, on
       {projects.map((p) => { const out = Math.max(0, (p.value || 0) - (p.paid || 0)); const st = INVOICE_STATUS.find((s) => s.key === p.invoiceStatus) || INVOICE_STATUS[0];
         return (<div key={p.id} className="grid items-center" style={{ gridTemplateColumns: "2fr 1.4fr 1fr 1fr 1fr 1.3fr", padding: "12px 16px", fontSize: 13, color: C.text, borderBottom: `1px solid ${C.line}` }}>
           <span>{p.name}</span><span style={{ color: C.mut }}>{custName(customers, p.customerId)}</span><span>{gbp(p.value)}</span><span style={{ color: C.green }}>{gbp(p.paid)}</span><span style={{ color: out ? C.orange : C.mut2 }}>{gbp(out)}</span>
-          <select value={p.invoiceStatus} onChange={(e) => onInvoiceStatus(p.id, e.target.value)} style={{ background: C.panel2, color: st.color, border: `1px solid ${st.color}44`, borderRadius: 6, fontSize: 12, padding: "4px 6px", outline: "none", width: "fit-content" }}>{INVOICE_STATUS.map((s) => <option key={s.key} value={s.key} style={{ color: C.text, background: C.panel2 }}>{s.label}</option>)}</select></div>); })}</Card>
+          <select value={p.invoiceStatus} onChange={(e) => onInvoiceStatus(p.id, e.target.value)} style={{ background: C.panel2, color: st.color, border: `1px solid ${st.color}44`, borderRadius: 6, fontSize: 12, padding: "4px 6px", outline: "none", width: "fit-content" }}>{INVOICE_STATUS.map((s) => <option key={s.key} value={s.key} style={{ color: C.text, background: C.panel2 }}>{s.label}</option>)}</select></div>); })}</div>
     <div className="flex items-center justify-between mb-3"><h2 style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Quotations</h2><button onClick={() => setView("proposals")} className="flex items-center gap-1" style={{ fontSize: 12, color: C.cyan }}><Receipt size={13} /> Quotation templates</button></div>
     <Card style={{ padding: 0, marginBottom: 24, overflow: "hidden" }}>
       <div className="grid" style={{ gridTemplateColumns: "2fr 1.4fr 1fr 1.2fr", padding: "12px 16px", fontSize: 11, color: C.mut2, borderBottom: `1px solid ${C.line}`, letterSpacing: "0.03em" }}><span>QUOTATION</span><span>CUSTOMER</span><span>VALUE</span><span>STATUS</span></div>
@@ -862,22 +877,71 @@ function Products({ products, tasks, activeProduct, setActiveProduct, onSetStage
 
 /* --------------------------- Map --------------------------- */
 function TerritoryMap({ customers, projects }) {
-  const W = 460, H = 560;
-  const B = { latMin: 49.9, latMax: 58.8, lngMin: -8.3, lngMax: 1.9 };
-  const proj = (lat, lng) => ({ x: ((lng - B.lngMin) / (B.lngMax - B.lngMin)) * W, y: H - ((lat - B.latMin) / (B.latMax - B.latMin)) * H });
-  const refs = [["London", 51.5074, -0.1278], ["Birmingham", 52.4862, -1.8904], ["Manchester", 53.4808, -2.2426], ["Leeds", 53.8008, -1.5491], ["Bristol", 51.4545, -2.5879], ["Newcastle", 54.9783, -1.6178], ["Cardiff", 51.4816, -3.1791], ["Glasgow", 55.8642, -4.2518], ["Edinburgh", 55.9533, -3.1883]];
+  const mapEl = useRef(null), mapRef = useRef(null), layerRef = useRef(null);
   const revOf = (id) => projects.filter((p) => p.customerId === id).reduce((a, p) => a + (p.revenueRecognised || 0), 0);
   const placed = customers.map((c) => ({ c, co: coordsOf(c), rev: revOf(c.id) })).filter((x) => x.co);
-  const maxRev = Math.max(1, ...placed.map((x) => x.rev));
   const noCoords = customers.filter((c) => !coordsOf(c));
+  const totalRev = placed.reduce((a, x) => a + x.rev, 0);
+  const maxRev = Math.max(1, ...placed.map((x) => x.rev));
+  const hasL = typeof window !== "undefined" && window.L;
+  const [colorMode, setColorMode] = useState("health");
+  const [filterVal, setFilterVal] = useState("all");
+  const DIMS = {
+    health: { label: "Health", opts: Object.keys(HEALTH).map((k) => ({ val: k, label: HEALTH[k].label, color: HEALTH[k].color })), get: (c) => c.health || "healthy" },
+    source: { label: "Source", opts: SOURCES.map((s) => ({ val: s, label: s, color: SOURCE_COLOR[s] })), get: (c) => c.source || "Other" },
+    status: { label: "Status", opts: ["Lead", "Discovery", "Proposal", "Active", "Retainer", "Closed"].map((s) => ({ val: s, label: s, color: STATUS_COLOR[s] || C.mut2 })), get: (c) => c.status || "Lead" },
+  };
+  const dim = DIMS[colorMode];
+  const shown = placed.filter(({ c }) => filterVal === "all" || dim.get(c) === filterVal);
+
+  useEffect(() => {
+    if (!hasL || !mapEl.current) return;
+    const L = window.L;
+    if (!mapRef.current) {
+      mapRef.current = L.map(mapEl.current, { zoomControl: true, scrollWheelZoom: true, worldCopyJump: true }).setView([54.5, -3], 5);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 19, subdomains: "abcd", attribution: "&copy; OpenStreetMap &copy; CARTO" }).addTo(mapRef.current);
+      layerRef.current = L.layerGroup().addTo(mapRef.current);
+    }
+    const map = mapRef.current, grp = layerRef.current; grp.clearLayers();
+    const pts = [];
+    shown.forEach(({ c, co, rev }) => {
+      const ov = dim.opts.find((x) => x.val === dim.get(c)); const col = ov ? ov.color : C.cyan;
+      const radius = 9 + Math.round((rev / maxRev) * 18);
+      L.circleMarker([co[0], co[1]], { radius: radius + 6, color: col, weight: 0, fillColor: col, fillOpacity: 0.18 }).addTo(grp);
+      const m = L.circleMarker([co[0], co[1]], { radius, color: "#ffffff", weight: 1.5, fillColor: col, fillOpacity: 0.9 });
+      m.bindPopup(`<b>${c.company}</b><br>${c.city || ""}<br>${gbp(rev)} earned · ${ov ? ov.label : ""}`);
+      m.addTo(grp); m.bindTooltip(c.company, { direction: "top", offset: [0, -radius] });
+      pts.push([co[0], co[1]]);
+    });
+    if (pts.length === 1) map.setView(pts[0], 7);
+    else if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 9 });
+    const t = setTimeout(() => map.invalidateSize(), 150);
+    return () => clearTimeout(t);
+  }, [customers, projects, hasL, colorMode, filterVal]);
+  useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
+
+  const topPlace = [...placed].sort((a, b) => b.rev - a.rev)[0];
   return (<div><Topbar title="Map" sub="Where your customers are — and where you're winning." />
+    <div className="grid grid-cols-4 gap-4 mb-5">
+      <Stat label="Clients mapped" value={placed.length} accent={C.cyan} />
+      <Stat label="Revenue mapped" value={gbp(totalRev)} accent={C.green} />
+      <Stat label="Top location" value={topPlace ? (topPlace.c.city || topPlace.c.company) : "—"} accent={C.purple} />
+      <Stat label="Needs a location" value={noCoords.length} accent={C.orange} />
+    </div>
     <div className="grid grid-cols-3 gap-5">
-      <Card className="col-span-2" style={{ padding: 18 }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", maxHeight: 620, background: C.panel2, borderRadius: 12 }}>
-          {refs.map((r) => { const q = proj(r[1], r[2]); return (<g key={r[0]}><circle cx={q.x} cy={q.y} r={2.5} fill={C.mut2} /><text x={q.x + 5} y={q.y + 3} fill={C.mut2} style={{ fontSize: 9 }}>{r[0]}</text></g>); })}
-          {placed.map(({ c, co, rev }) => { const q = proj(co[0], co[1]); const rad = 8 + (rev / maxRev) * 20; const col = HEALTH[c.health] ? HEALTH[c.health].color : C.cyan;
-            return (<g key={c.id}><circle cx={q.x} cy={q.y} r={rad} fill={col} opacity={0.22} /><circle cx={q.x} cy={q.y} r={5} fill={col} /><text x={q.x + rad + 3} y={q.y + 4} fill={C.text} style={{ fontSize: 11, fontWeight: 600 }}>{c.company}</text></g>); })}
-        </svg>
+      <Card className="col-span-2" style={{ padding: 12 }}>
+        <div className="flex items-center justify-between mb-2.5 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span style={{ fontSize: 11, color: C.mut2 }}>Colour by</span>
+            <select value={colorMode} onChange={(e) => { setColorMode(e.target.value); setFilterVal("all"); }} style={{ ...inputStyle, width: "auto", padding: "5px 8px", fontSize: 12 }}>{Object.keys(DIMS).map((k) => <option key={k} value={k}>{DIMS[k].label}</option>)}</select>
+            <span style={{ fontSize: 11, color: C.mut2, marginLeft: 6 }}>Show</span>
+            <select value={filterVal} onChange={(e) => setFilterVal(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "5px 8px", fontSize: 12 }}><option value="all">All</option>{dim.opts.map((o) => <option key={o.val} value={o.val}>{o.label}</option>)}</select>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">{dim.opts.map((o) => (<span key={o.val} className="flex items-center gap-1" style={{ fontSize: 10.5, color: C.mut }}><span style={{ width: 8, height: 8, borderRadius: 8, background: o.color, display: "inline-block" }} /> {o.label}</span>))}</div>
+        </div>
+        {hasL
+          ? <div ref={mapEl} style={{ width: "100%", height: 540, borderRadius: 10, overflow: "hidden" }} />
+          : <MapFallback placed={shown} maxRev={maxRev} dim={dim} />}
       </Card>
       <div>
         <h3 style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 10 }}>Customers by revenue</h3>
@@ -885,11 +949,21 @@ function TerritoryMap({ customers, projects }) {
           <div className="flex items-center justify-between"><span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.company}</span><RelHealth h={c.health} /></div>
           <div className="flex items-center gap-1 mt-1" style={{ fontSize: 11, color: C.mut2 }}><MapPin size={11} /> {c.city || "—"} · {gbp(rev)} earned</div></Card>))}
           {placed.length === 0 && <Card style={{ padding: 14 }}><span style={{ fontSize: 12, color: C.mut2 }}>No customers placed yet.</span></Card>}</div>
-        {noCoords.length > 0 && <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>No location set for: {noCoords.map((c) => c.company).join(", ")}. Add a city in the customer profile to map them.</div>}
-        <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>Marker size reflects revenue recognised. Seeded cities are placeholders — edit each customer to set the real location.</div>
+        {noCoords.length > 0 && <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>No location set for: {noCoords.map((c) => c.company).join(", ")}. Add a city (or lat/lng) in the customer profile to map them.</div>}
+        <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>Marker size = revenue recognised; colour = relationship health. Drag to pan, scroll to zoom. Seeded cities are placeholders — edit a customer to set the real location.</div>
       </div>
     </div>
   </div>);
+}
+/* Lightweight scatter shown only if the map library hasn't loaded (e.g. offline preview) */
+function MapFallback({ placed, maxRev, dim }) {
+  const W = 460, H = 540, B = { latMin: 49.9, latMax: 58.8, lngMin: -8.3, lngMax: 1.9 };
+  const proj = (lat, lng) => ({ x: ((lng - B.lngMin) / (B.lngMax - B.lngMin)) * W, y: H - ((lat - B.latMin) / (B.latMax - B.latMin)) * H });
+  return (<svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", maxHeight: 540, background: C.panel2, borderRadius: 10 }}>
+    {placed.map(({ c, co, rev }) => { const q = proj(co[0], co[1]); const rad = 8 + (rev / maxRev) * 18; const ov = dim ? dim.opts.find((x) => x.val === dim.get(c)) : null; const col = ov ? ov.color : (HEALTH[c.health] ? HEALTH[c.health].color : C.cyan);
+      return (<g key={c.id}><circle cx={q.x} cy={q.y} r={rad} fill={col} opacity={0.22} /><circle cx={q.x} cy={q.y} r={5} fill={col} /><text x={q.x + rad + 3} y={q.y + 4} fill={C.text} style={{ fontSize: 11, fontWeight: 600 }}>{c.company}</text></g>); })}
+    <text x={W / 2} y={H - 10} fill={C.mut2} textAnchor="middle" style={{ fontSize: 10 }}>Live map loads on the deployed site</text>
+  </svg>);
 }
 
 /* --------------------------- Root --------------------------- */
