@@ -264,9 +264,9 @@ function Login({ onLogin }) {
         <section className="hidden lg:block" style={{ maxWidth: 520 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "6px 10px", border: `1px solid rgba(0,184,255,.22)`, borderRadius: 999, color: C.cyan, fontSize: 10.5, letterSpacing: ".16em", background: "rgba(0,184,255,.045)" }}>KAI-TEQ OPERATING SYSTEM</div>
           <h1 style={{ fontSize: 54, lineHeight: 1.02, letterSpacing: "-0.035em", fontWeight: 650, marginTop: 24 }}>From Ideas to <span style={{ background: GRAD, WebkitBackgroundClip: "text", color: "transparent" }}>Impact.</span></h1>
-          <p style={{ color: C.mut, fontSize: 16, lineHeight: 1.75, maxWidth: 440, marginTop: 18 }}>AI agents, automation and intelligent workflows — organised in one place to help KAI-TEQ operate smarter, move faster and scale with confidence.</p>
+          <p style={{ color: C.mut, fontSize: 16, lineHeight: 1.75, maxWidth: 440, marginTop: 18 }}>Customers, projects, finances and workflows connected in one place to help KAI-TEQ operate smarter, move faster and scale with confidence.</p>
           <div className="grid grid-cols-3 gap-3 mt-9" style={{ maxWidth: 470 }}>
-            {[['01','OPERATE','Smarter systems'],['02','AUTOMATE','Less manual work'],['03','SCALE','Clearer decisions']].map(([n,a,b])=><div key={n} style={{ padding: "14px 14px 13px", borderTop: `1px solid ${C.line}`, background: "linear-gradient(180deg, rgba(255,255,255,.025), transparent)" }}><div style={{ color: C.cyan, fontSize: 9, letterSpacing: ".16em" }}>{n}</div><div style={{ fontSize: 11, letterSpacing: ".12em", marginTop: 8 }}>{a}</div><div style={{ color: C.mut2, fontSize: 10.5, marginTop: 4 }}>{b}</div></div>)}
+            {[['01','OPERATE','Everything connected'],['02','AUTOMATE','Less manual work'],['03','SCALE','Built for growth']].map(([n,a,b])=><div key={n} style={{ padding: "14px 14px 13px", borderTop: `1px solid ${C.line}`, background: "linear-gradient(180deg, rgba(255,255,255,.025), transparent)" }}><div style={{ color: C.cyan, fontSize: 9, letterSpacing: ".16em" }}>{n}</div><div style={{ fontSize: 11, letterSpacing: ".12em", marginTop: 8 }}>{a}</div><div style={{ color: C.mut2, fontSize: 10.5, marginTop: 4 }}>{b}</div></div>)}
           </div>
         </section>
         <section className="w-full" style={{ maxWidth: 490, justifySelf: "center" }}>
@@ -277,12 +277,12 @@ function Login({ onLogin }) {
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Welcome back</div>
             <div style={{ color: C.mut2, fontSize: 12, marginBottom: 22 }}>Sign in to your KAI-TEQ workspace</div>
             <label style={{ fontSize: 12, color: C.mut }}>Work email</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@kai-teq.com" className="w-full rounded-lg px-3 py-3 mt-1.5 mb-4 outline-none" style={{ background: "rgba(19,26,48,.82)", border: `1px solid ${C.line}`, color: C.text, fontSize: 14, boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)" }} />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="firstname.lastname@kai-teq.com" className="w-full rounded-lg px-3 py-3 mt-1.5 mb-4 outline-none" style={{ background: "rgba(19,26,48,.82)", border: `1px solid ${C.line}`, color: C.text, fontSize: 14, boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)" }} />
             <label style={{ fontSize: 12, color: C.mut }}>Password</label>
             <input value={pw} type="password" onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="••••••••" className="w-full rounded-lg px-3 py-3 mt-1.5 outline-none" style={{ background: "rgba(19,26,48,.82)", border: `1px solid ${C.line}`, color: C.text, fontSize: 14 }} />
             {err && <div style={{ color: C.orange, fontSize: 12, marginTop: 10 }}>{err}</div>}
             <button onClick={submit} className="w-full rounded-lg py-3 mt-6 font-semibold" style={{ background: GRAD, color: "#fff", fontSize: 14, boxShadow: "0 10px 30px rgba(65,105,255,.20)" }}>Sign in <span style={{ marginLeft: 5 }}>→</span></button>
-            <div style={{ fontSize: 10.5, color: C.mut2, marginTop: 18, textAlign: "center", lineHeight: 1.55 }}>Demo sign-in — any email works (use “kudzai” to sign in as Kudzai). Replace with secure authentication for live use.</div>
+            <div style={{ fontSize: 10.5, color: C.mut2, marginTop: 18, textAlign: "center", lineHeight: 1.55 }}></div>
           </div>
           <div className="flex items-center justify-center gap-3 mt-6" style={{ color: C.mut2, fontSize: 9.5, letterSpacing: ".15em" }}><span>PLAN</span><span style={{color:C.cyan}}>•</span><span>AUTOMATE</span><span style={{color:C.blue}}>•</span><span>DELIVER</span><span style={{color:C.purple}}>•</span><span>GROW</span></div>
         </section>
