@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KAI-TEQ — Intelligent Work. Powered by AI.</title>
+    <!-- Tailwind utilities (layout/spacing). Brand colours are inline in the app.
+         Fine for an internal tool; swap for a Tailwind build step later if you want. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <style>
+      html, body, #root { height: 100%; margin: 0; background: #0B0F1E; }
+      @media (max-width: 1100px) {
+        aside { width: 200px !important; }
+        main { padding: 22px 18px !important; }
+        .grid-cols-7, .grid-cols-6, .grid-cols-5, .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      }
+      @media (max-width: 760px) {
+        #root > div { min-width: 720px; }
+        aside { width: 176px !important; }
+        main { padding: 18px 14px !important; }
+        .grid-cols-7, .grid-cols-6, .grid-cols-5, .grid-cols-4, .grid-cols-3, .grid-cols-2 { grid-template-columns: 1fr !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
